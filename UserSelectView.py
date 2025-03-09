@@ -55,19 +55,25 @@ class UserSelectView(UIView):
 
         # self._body.add(box)
 
-        grid = self._body.add(UIGridLayout(
-            size_hint=(0, 0),  # wrap children
-            row_count=4,  # title | instructions | dropdown | join button
-            column_count=2,  # label and input field
-            vertical_spacing=10,
-            horizontal_spacing=5,
-        ))
+        grid = self._body.add(
+            UIGridLayout(
+                size_hint=(0, 0),  # wrap children
+                row_count=4,  # title | instructions | dropdown | join button
+                column_count=2,  # label and input field
+                vertical_spacing=10,
+                horizontal_spacing=5,
+            )
+        )
         grid.with_padding(all=50)
         grid.with_background(color=arcade.uicolor.GREEN_GREEN_SEA)
 
-
         title = grid.add(
-            UILabel(text="Select which character you'd like, then click join game", width=150, font_size=20, font_name="arial"),
+            UILabel(
+                text="Select which character you'd like, then click join game",
+                width=150,
+                font_size=20,
+                font_name="arial",
+            ),
             column=0,
             row=0,
             column_span=2,
@@ -75,45 +81,47 @@ class UserSelectView(UIView):
 
         title.with_padding(bottom=20)
 
-        grid.add(UILabel("Select your character!",  width=80,font_name="arial"),column=0,
-            row=1)
-        
-        # TODO: instead of using suspects list, at some point should only do remaining characters once calculated
-        self.dropdown =  UIDropdown( 
-                default=players.SUSPECTS[0],
-                options=players.SUSPECTS,
-                size_hint=(1,None),
-
+        grid.add(
+            UILabel("Select your character!", width=80, font_name="arial"),
+            column=0,
+            row=1,
         )
-        
-        grid.add(self.dropdown, column=1,
-            row=1, size_hint=(1, 0.1))
-        
+
+        # TODO: instead of using suspects list, at some point should only do remaining characters once calculated
+        self.dropdown = UIDropdown(
+            default=players.SUSPECTS[0],
+            options=players.SUSPECTS,
+            size_hint=(1, None),
+        )
+
+        grid.add(self.dropdown, column=1, row=1, size_hint=(1, 0.1))
+
         self.selected_character = players.SUSPECTS[0]
-        
+
         self.dropdown.on_change = self.on_dropdown_change
 
         self.join_game_as_character_button = UIFlatButton(
             text="Click Here to Join As {}".format(self.selected_character),
             font_name="arial",
             text_color=arcade.uicolor.WHITE,
-            size_hint=(1,None)
+            size_hint=(1, None),
         )
         grid.add(
-            self.join_game_as_character_button, column=0,
+            self.join_game_as_character_button,
+            column=0,
             row=3,
-            column_span=2, size_hint=(1, 0.1)
+            column_span=2,
+            size_hint=(1, 0.1),
         )
 
         self.join_game_as_character_button.on_click = self.join_game_as_character
 
-
-      
     def on_dropdown_change(self, event: UIOnChangeEvent | None):
         """Called when the dropdown value changes."""
         self.selected_character = event.new_value
-        self.join_game_as_character_button.text = "Click here to join as {}".format(self.selected_character)
-
+        self.join_game_as_character_button.text = "Click here to join as {}".format(
+            self.selected_character
+        )
 
     def join_game_as_character(self, event: UIOnClickEvent | None):
         print("joined the game as " + self.selected_character)
@@ -121,7 +129,6 @@ class UserSelectView(UIView):
         #     window.show_view(OptionView())
 
         # self.window.show_view(UserSelectView.UserSelectView())
-
 
 
 def main():
@@ -132,4 +139,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
