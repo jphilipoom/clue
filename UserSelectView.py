@@ -30,6 +30,7 @@ from arcade.gui import (
 )
 from arcade.gui import UIInputText, UIOnClickEvent, UIView
 from arcade.gui.widgets.layout import UIGridLayout, UIAnchorLayout
+import BoardView
 
 DETAILS_FONT = ("arial", "arial Narrow")
 DEFAULT_FONT = ("arial", "arial")
@@ -125,10 +126,7 @@ class UserSelectView(UIView):
 
     def join_game_as_character(self, event: UIOnClickEvent | None):
         print("joined the game as " + self.selected_character)
-        # user_select_view = UserSelectView()
-        #     window.show_view(OptionView())
-
-        # self.window.show_view(UserSelectView.UserSelectView())
+        self.window.show_view(BoardView.BoardView())
 
 
 def main():
