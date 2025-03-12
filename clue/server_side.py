@@ -40,11 +40,12 @@ def distribute_cards(players_list: list[Player]):
             if len(remaining_suspects) > 0:
                 suspect = remaining_suspects.pop()
                 player.cards['Suspect'].append(suspect)
-            if len(remaining_weapons) > 0:
+            elif len(remaining_weapons) > 0:
                 weapon = remaining_weapons.pop()
                 player.cards['Weapon'].append(weapon)
-            location = remaining_locations.pop()
-            player.cards['Location'].append(location)
+            elif len(remaining_locations) > 0:
+                location = remaining_locations.pop()
+                player.cards['Location'].append(location)
 
     return solution
 
@@ -56,25 +57,24 @@ def initialize_game():
         print(f'Error: {host_player} is not a valid character.')
         print(f'Which of the following suspects would you like to play as?\n{SUSPECTS}')
         host_player = input('Please type in your preferred character: ')
-    available_suspects = SUSPECTS
+    available_suspects = SUSPECTS.copy()
     available_suspects.remove(host_player)
     all_players = [Player(host_player)]
 
-    random.seed(5)
     game_code = random.choices(string.ascii_uppercase, k=3) + random.choices(
         string.digits, k=3)
-    print(f'Your game code is {game_code}! Share this code with friends for '
+    print('Your game code is ' + ''.join(game_code) + '! Share this code with friends for '
           'them to join.\n')
 
     ready_to_start = False
     while not ready_to_start:
         # TODO: websocket magic to receive suspect selection from clients
         print(f'Currently available characters are: {available_suspects}')
-        new_player = input('Which would you like to play as?\n')
+        new_player = input('Which would you like to play as? ')
         while new_player not in available_suspects:
             print(f'Error: {new_player} is not a valid character name.')
             print(f'Currently available characters are: {available_suspects}')
-            new_player = input('Which would you like to play as?\n')
+            new_player = input('Which would you like to play as? ')
 
         all_players.append(Player(new_player))
         available_suspects.remove(new_player)
@@ -82,12 +82,13 @@ def initialize_game():
         print(f'There are currently {6 - len(available_suspects)} players.')
         if len(available_suspects) > 3:
             print('Waiting for at least 3 players to join...')
-
+        elif len(available_suspects) == 0:
+            print('Six players joined! Starting game...')
+            ready_to_start = True
         else:
-            ready_to_start = input('If you are ready to start the game, type "y".'
-                                   ' To continue waiting for players, type any'
-                                   ' other character.')
-            if ready_to_start == 'y':
+            user_ready = input('If you are ready to start the game, type "y".'
+                               ' To continue waiting for players, hit Enter.')
+            if user_ready == 'y':
                 ready_to_start = True
 
     # If Miss Scarlet is in play, she goes first, otherwise by join order
@@ -106,7 +107,7 @@ def initialize_game():
         print(f'{player.name}, your cards are: {player.cards}')
 
     all_locations = set()
-    for location in ROOMS + HALLWAYS:
+    for location in list(ROOMS.keys()) + list(HALLWAYS.keys()):
         next_loc = Location(location)
         for suspect in all_players + all_non_players:
             if STARTING_LOCS[suspect.name] == location:
@@ -128,17 +129,18 @@ def move_active_player(active_player: Player, all_locations: list[Location]):
 
     # TODO: convert to websocket magic
     print(f'{active_player.name}, your available moves are {valid_moves}.')
-    next_location = input('Where would you like to move to?')
+    next_location = input('Where would you like to move to? ')
     while next_location not in valid_moves:
         print(f'Error: {next_location} is not a valid location to move to.')
         print(f'{active_player.name}, your available moves are {valid_moves}.')
-        next_location = input('Where would you like to move to?')
+        next_location = input('Where would you like to move to? ')
 
     print(f'{active_player.name} has moved to {next_location}!')
-    active_player.location = next_location
-    for location in ROOMS + HALLWAYS:
+
+    for location in all_locations:
         if location.name == next_location:
             location.add_suspect(active_player)
+            active_player.location = location
             break
 
     return active_player, all_locations
@@ -152,18 +154,18 @@ def make_suggestion(active_player: Player, all_players: list[Player],
     print(f'You have see the following cards of other players: {active_player.seen_cards}\n')
     print(f'You will be making a suggestion in {active_player_location.name}')
     print(f'The list of all weapons is {WEAPONS}')
-    weapon = input('Type the name of the weapon you would like to suggest was used')
+    weapon = input('Type the name of the weapon you would like to suggest was used: ')
     while weapon not in WEAPONS:
         print(f'Error: {weapon} is not a valid weapon.')
         print(f'The list of all weapons is {WEAPONS}')
-        weapon = input('Type the name of the weapon you would like to suggest was used')
+        weapon = input('Type the name of the weapon you would like to suggest was used: ')
 
     print(f'The list of all suspects is {SUSPECTS}')
-    suspect = input('Type the name of the suspect you would like to suggest was the murderer')
+    suspect = input('Type the name of the suspect you would like to suggest was the murderer: ')
     while suspect not in SUSPECTS:
         print(f'Error: {suspect} is not a valid suspect.')
         print(f'The list of all suspects is {SUSPECTS}')
-        suspect = input('Type the name of the suspect you would like to suggest was the murderer')
+        suspect = input('Type the name of the suspect you would like to suggest was the murderer: ')
     for character in all_players + all_non_players:
         if character.name == suspect:
             print(f'{suspect} has been moved to {active_player_location.name}!')
@@ -173,7 +175,7 @@ def make_suggestion(active_player: Player, all_players: list[Player],
     active_player_index = all_players.index(active_player)
     num_players = len(all_players)
     disproven = False
-    for idx in range(num_players):
+    for idx in range(1, num_players):
         questioned_player = all_players[(active_player_index + idx) % num_players]
         cards_to_disprove = questioned_player.check_accusation(weapon,
                                                                suspect,
@@ -213,25 +215,25 @@ def make_accusation(active_player: Player, solution):
 
     print(f'The list of all rooms is: {ROOMS.keys()}')
     room = input('Type the name of the room you would like to accuse the murder '
-                 'took place in.')
+                 'took place in: ')
     while room not in ROOMS.keys():
         print(f'Error: {room} is not a valid room.')
         print(f'The list of all rooms is: {ROOMS.keys()}')
         room = input('Type the name of the room you would like to accuse the murder '
-                     'took place in.')
+                     'took place in: ')
     print(f'The list of all weapons is: {WEAPONS}')
-    weapon = input('Type the name of the weapon you would like to accuse was used')
+    weapon = input('Type the name of the weapon you would like to accuse was used: ')
     while weapon not in WEAPONS:
         print(f'Error: {weapon} is not a valid weapon.')
         print(f'The list of all weapons is: {WEAPONS}')
-        weapon = input('Type the name of the weapon you would like to accuse was used')
+        weapon = input('Type the name of the weapon you would like to accuse was used: ')
 
     print(f'The list of all suspects is {SUSPECTS}')
-    suspect = input('Type the name of the suspect you would like to accuse was the murderer')
+    suspect = input('Type the name of the suspect you would like to accuse was the murderer: ')
     while suspect not in SUSPECTS:
         print(f'Error: {suspect} is not a valid suspect.')
         print(f'The list of all suspects is {SUSPECTS}')
-        suspect = input('Type the name of the suspect you would like to accuse was the murderer')
+        suspect = input('Type the name of the suspect you would like to accuse was the murderer: ')
 
     print(f'{active_player.name} is accusing {suspect} of murdering Mr. Boddy'
           f'with the {weapon} in the {room}!')
@@ -260,10 +262,9 @@ def turn(active_player: Player, all_players: list[Player],
 
     if action == 'm':
         active_player, all_locations = move_active_player(active_player, all_locations)
-        action = input('Would you like to make a suggestion? Type \'s\' if so')
-        while action not in ['m', 's']:
-            print(f'Error: {action} is not a valid response.')
-            action = input('Do you want to move or make a suggestion? Type \'m\' or \'s\'')
+        if active_player.location.type == 'Room':
+            action = input('Would you like to make a suggestion? Type \'s\' if so,'
+                           ' or Enter to end turn.')
 
     if action == 's':
         disproven, active_player, all_players, all_non_players = make_suggestion(active_player,
@@ -272,11 +273,13 @@ def turn(active_player: Player, all_players: list[Player],
 
         if not disproven:
             print('No one was able to disprove the suggestion!')
-            action = input(f'{active_player.name}, would you like to make an accusation? If so, type \'a\'.')
+
+    action = input(f'{active_player.name}, would you like to make an accusation? If so, type \'a\','
+                   f' otherwise hit Enter.')
 
     if action == 'a':
         action = input('Are you sure? If your accusation is wrong you will lose. Type \'y\''
-                       'to proceed.')
+                       'to proceed, \'n\' to cancel.')
         if action == 'y':
             solved, active_player = make_accusation(active_player, solution)
 
