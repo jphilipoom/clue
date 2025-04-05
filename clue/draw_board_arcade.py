@@ -1,6 +1,5 @@
 import arcade
 
-
 BOARD_SIZE = 800 # Board width/height
 FRAME_OFFSET = 15
 ROOM_SIZE = BOARD_SIZE/4
