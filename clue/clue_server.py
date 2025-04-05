@@ -1,25 +1,20 @@
-import players
 import asyncio
 import websockets
 import json
 from msgs.messages import ChoosePlayer, Accusation, Suggestion, SuggestionResponse, PublicSuggestionResponse
-from players import (
-    Player
-    )
+from player import Player
     
-from server_side import initialize_game,generate_valid_moves
+from server_side_util import initialize_game,generate_valid_moves
 
 # Keep track of player connections (assigned player -> connection)
 connected_players = {}
 
 all_players = []
+
 available_suspects = ['Colonel Mustard', 'Miss Scarlet', 'Professor Plum',
             'Mr. Green', 'Mrs. White', 'Mrs. Peacock']
-all_non_players = []
-all_locations = set()
-solution = {}
 
-SOLVED = False
+solution = {}
 
 LOCATION_TO_PLAYER = {'Study':"", 'H1':"", 'Hall':"", 'H2':"Miss Scarlet", 'Lounge':"",
                     'H3':"Professor Plum", 'H4':"", 'H5':"Colonel Mustard", 
@@ -27,6 +22,7 @@ LOCATION_TO_PLAYER = {'Study':"", 'H1':"", 'Hall':"", 'H2':"Miss Scarlet", 'Loun
                     'H8':"Mrs. Peacock", 'H9':"", 'H10':"", 
                     'Conservatory':"", 'H11':"Mr. Green", 'Ballroom':"", 'H12':"Mrs. White",'Kitchen':"",
                     '':''}
+
 PLAYER_TO_LOCATION = {
     "Miss Scarlet": 'H2', 
     "Professor Plum": 'H3', 
@@ -85,7 +81,7 @@ async def handler(websocket):
                     print(all_players)
                     START_GAME = True
                     print("Starting game!")
-                    all_players, all_non_players, all_locations, solution = initialize_game(all_players,available_suspects)
+                    all_players, solution = initialize_game(all_players)
                     print(f"The solution is: {solution}")
                     all_players[CURRENT_TURN_IDX].current_turn = True
                     generate_valid_moves(all_players,PLAYER_TO_LOCATION)
