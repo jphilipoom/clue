@@ -92,7 +92,7 @@ class BoardScreen(QWidget):
     current_loc = None
 
     def update_name(self, name):
-        player_name = name
+        self.player_name = name
 
     # def __init__(self):
     def __init__(self, websocket_thread, main_window):
@@ -231,14 +231,7 @@ class BoardScreen(QWidget):
             ]
         ]
 
-        self.tile_clicked.connect(
-            lambda name: (
-                # print("Clicked tile:", name),
-                setattr(self, "current_loc", name),
-                setattr(self, "turn_phase", "after_move"),
-                self.update_button_vis(),
-            )
-        )
+        self.tile_clicked.connect(lambda name: self.handle_tile_click(name))
 
         self.suggestion_button_layout = QVBoxLayout()
         self.suggestion_button_container = QWidget()
@@ -265,6 +258,8 @@ class BoardScreen(QWidget):
         for key in dictionary.keys():
             self.update_player_position(key, dictionary[key])
 
+        # TODO: not sure where, but make the palyers name on board move right after move instead of at end of turn
+
     def player_turn_dict(self, dictionary):
         """Slot to update the player list based on the server's message."""
         self.turn_dict = dictionary
@@ -279,6 +274,8 @@ class BoardScreen(QWidget):
             self.update_button_vis()
         else:
             self.notification_label.setText("It is somebody else's turn")
+            self.turn_phase = "none!"
+            self.update_button_vis()
 
             self.highlight_valid_moves([])
             print("NOT")
@@ -287,6 +284,8 @@ class BoardScreen(QWidget):
 
         [button.setVisible(False) for button in self.buttons]
 
+        if self.turn_phase == "none!":
+            return
         if self.turn_phase == "start":
             self.move_button.setVisible(True)
             self.dont_move_button.setVisible(True)
@@ -318,6 +317,7 @@ class BoardScreen(QWidget):
         if self.turn_phase == "after_suggest":
             self.accusation_button.setVisible(True)
             self.dont_accusation_button.setVisible(True)
+
         if self.turn_phase == "accuse":
             [
                 dropdown.setVisible(True)
@@ -340,6 +340,16 @@ class BoardScreen(QWidget):
             ]
 
             self.turn_phase = "done"
+
+    def handle_tile_click(self, name):
+        self.current_loc = name
+        self.turn_phase = "after_move"
+        self.update_button_vis()
+
+        print("and it is " + str(self.player_name))
+
+        if hasattr(self, "player_name") and self.player_name:
+            self.update_player_position(self.player_name, name)
 
     def build_board(self):
         # Define board layout (None = empty cell)
@@ -409,6 +419,11 @@ class BoardScreen(QWidget):
         self.player_suggestion_signal.emit(msg)
 
     def suggestion_response_list(self, options):
+
+        self.turn_phase = "none!"
+
+        self.update_button_vis()
+
         self.notification_label.setText(
             "It is somebody else's turn. They made a suggestion, what will you respond with?"
         )

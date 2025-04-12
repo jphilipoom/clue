@@ -96,6 +96,7 @@ class MainWindow(QWidget):
 
     def on_character_selected(self, character_selected_dict):
         character_name = character_selected_dict["selected_player"]
+        self.player_name = character_name
         self.setWindowTitle(f"Clue - {character_name}")
 
         self.lobby_screen = LobbyScreen(

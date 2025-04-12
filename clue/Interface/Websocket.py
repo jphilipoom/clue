@@ -37,9 +37,6 @@ class WebSocketThread(QThread):
     update_board_signal = pyqtSignal(dict)  # Signal to update players list
     player_turn_signal = pyqtSignal(dict)  # Signal to update players list
     tile_clicked = pyqtSignal(str)  # Signal to get selected character name
-    # suggestion_signal = pyqtSignal(dict)
-    # accusation_signal = pyqtSignal(dict)
-
     suggestion_response_options_signal = pyqtSignal(list)
 
     (accusation_value, suggestion_value, suggestion_response_value) = (None, None, None)
@@ -53,9 +50,6 @@ class WebSocketThread(QThread):
 
         self.tile_move = None
 
-        # self.accusation_signal.connect(self.handle_accusation)
-        # self.suggestion_signal.connect(self.handle_suggestion)
-
         self.tile_clicked.connect(self.on_character_moved)
 
     def on_character_selected(self, character_selected_dict):
@@ -64,11 +58,9 @@ class WebSocketThread(QThread):
         self.starting_game = character_selected_dict["start"]
 
     def on_character_moved(self, move_loc):
-        print("MOVED IN WEBSOCKET REC " + move_loc)
         self.tile_move = move_loc
 
     def will_accuse(self, value):
-        print("will 3")
         self.will_accuse = value
 
     def will_suggest(self, value):
@@ -83,15 +75,11 @@ class WebSocketThread(QThread):
 
     def handle_suggestion(self, value):
         self.suggestion_value = value
-        print("value is ")
         print(value)
-        print("HANDLING SUGGEST")
 
     def handle_suggestion_response(self, value):
         self.suggestion_response_value = value
-        print("value is ")
         print(value)
-        print("HANDLING SUGGEST RESP")
 
     def run(self):
         # WebSocket connection and event loop
