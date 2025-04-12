@@ -17,6 +17,7 @@ from Interface.StartScreen import StartScreen
 from Interface.LobbyScreen import LobbyScreen
 from Interface.PlayerSelectScreen import PlayerSelectScreen
 from Interface.Player import Player
+from Interface.CardsScreen import CardsScreen
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
 from PyQt5.QtCore import QTimer, Qt
@@ -40,9 +41,10 @@ class MainWindow(QWidget):
         self.websocket_thread.start()  # Start the WebSocket thread
 
         # Create screens
-        self.start_screen = StartScreen(self)
+        self.start_screen = StartScreen(self.websocket_thread, self)
         self.player_select_screen = PlayerSelectScreen(self.websocket_thread, self)
         self.lobby_screen = LobbyScreen(self.websocket_thread, self)
+        self.cards_screen = CardsScreen(self.websocket_thread, self)
 
         # send data from player select screen to websocket to send update data to server
         self.player_select_screen.character_selected_signal.connect(
@@ -82,6 +84,11 @@ class MainWindow(QWidget):
         # Remove the current screen and show the lobby screen
         self.clear_layout()
         self.layout.addWidget(self.lobby_screen)
+
+    def show_cards_screen(self):
+        # Remove the current screen and show the lobby screen
+        self.clear_layout()
+        self.layout.addWidget(self.cards_screen)
 
     def clear_layout(self):
         # Remove all widgets from the layout to clear it for the new screen

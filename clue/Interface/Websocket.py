@@ -12,6 +12,7 @@ class WebSocketThread(QThread):
     player_list_signal = pyqtSignal(list)  # Signal to pass updated player list to GUI
     start_game_signal = pyqtSignal(bool)  # Signal to notify when game can start
     character_selected_signal = pyqtSignal(str)  # Signal to get selected character name
+    choose_player_signal = pyqtSignal(dict)
 
     def __init__(self):
         super().__init__()
@@ -44,6 +45,7 @@ class WebSocketThread(QThread):
                     # Update player list from the server message
                     self.players = [Player(x) for x in info["players"]]
                     self.player_list_signal.emit(self.players)
+                    self.choose_player_signal.emit(info)
 
                     # Wait until a character is selected
                     while self.selected_character is None:
