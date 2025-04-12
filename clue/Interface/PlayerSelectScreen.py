@@ -9,12 +9,14 @@ from PyQt5.QtWidgets import (
     QComboBox,
 )
 from PyQt5.QtCore import QThread, pyqtSignal
-from LobbyScreen import LobbyScreen
+from Interface.LobbyScreen import LobbyScreen
 
 
 class PlayerSelectScreen(QWidget):
     update_players_signal = pyqtSignal(list)  # Signal to update players list
-    character_selected = pyqtSignal(str)  # Signal to send selected character name
+    character_selected_signal = pyqtSignal(
+        str
+    )  # Signal to send selected character name
 
     def __init__(self, websocket_thread, main_window):
         super().__init__()
@@ -53,5 +55,5 @@ class PlayerSelectScreen(QWidget):
     def on_enter_lobby(self):
         # Switch to the lobby screen after entering lobby
         selected = self.character_dropdown.currentText()
-        self.character_selected.emit(selected)
+        self.character_selected_signal.emit(selected)
         self.main_window.show_lobby_screen()

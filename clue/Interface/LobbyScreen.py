@@ -11,7 +11,8 @@ from PyQt5.QtWidgets import (
 
 
 class LobbyScreen(QWidget):
-    def __init__(self, player_name="Unknown??"):
+    def __init__(self, websocket_thread, main_window, player_name="Unknown??"):
+
         super().__init__()
         layout = QVBoxLayout()
 

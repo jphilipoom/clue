@@ -10,13 +10,13 @@ from PyQt5.QtWidgets import (
     QComboBox,
 )
 
-from Websocket import WebSocketThread
+from Interface.Websocket import WebSocketThread
 
 # import StartScreen, LobbyScreen, PlayerSelectScreen
-from StartScreen import StartScreen
-from LobbyScreen import LobbyScreen
-from PlayerSelectScreen import PlayerSelectScreen
-from Player import Player
+from Interface.StartScreen import StartScreen
+from Interface.LobbyScreen import LobbyScreen
+from Interface.PlayerSelectScreen import PlayerSelectScreen
+from Interface.Player import Player
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
 from PyQt5.QtCore import QTimer, Qt
@@ -25,9 +25,10 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 
 class MainWindow(QWidget):
+    character_selected_signal = pyqtSignal(str)  # Signal to get selected character name
+
     def __init__(self):
         super().__init__()
-
         self.player_name = None
 
         # Create layout to manage screens
@@ -35,16 +36,22 @@ class MainWindow(QWidget):
         self.setLayout(self.layout)
 
         # Initialize WebSocket thread
-        # Initialize WebSocket thread and pass the WebSocket URL
         self.websocket_thread = WebSocketThread()
         self.websocket_thread.start()  # Start the WebSocket thread
 
         # Create screens
         self.start_screen = StartScreen(self)
         self.player_select_screen = PlayerSelectScreen(self.websocket_thread, self)
-        self.lobby_screen = LobbyScreen()
+        self.lobby_screen = LobbyScreen(self.websocket_thread, self)
 
-        self.player_select_screen.character_selected.connect(self.on_character_selected)
+        # send data from player select screen to websocket to send update data to server
+        self.player_select_screen.character_selected_signal.connect(
+            self.websocket_thread.on_character_selected
+        )
+        # send data from player select screen to here to update window title with player name
+        self.player_select_screen.character_selected_signal.connect(
+            self.on_character_selected
+        )
 
         # Initially show the start screen
         self.layout.addWidget(self.start_screen)
@@ -64,11 +71,12 @@ class MainWindow(QWidget):
         # Emit the signal to update the player list AFTER the PlayerSelectScreen is shown
         self.player_select_screen.update_players_signal.emit(simulated_players)
 
-    def on_character_selected(self, name):
-        self.player_name = name
-        self.setWindowTitle(f"Clue - {name}")
+    def on_character_selected(self, character_name):
+        self.setWindowTitle(f"Clue - {character_name}")
 
-        self.lobby_screen = LobbyScreen(player_name=name)
+        self.lobby_screen = LobbyScreen(
+            self.websocket_thread, self, player_name=character_name
+        )
 
     def show_lobby_screen(self):
         # Remove the current screen and show the lobby screen
