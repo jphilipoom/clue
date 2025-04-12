@@ -98,6 +98,7 @@ class MainWindow(QWidget):
     def show_board_screen(self):
         # Remove the current screen and show the lobby screen
         self.clear_layout()
+        self.board_screen.update_name(self.player_name)
         self.layout.addWidget(self.board_screen)
 
     def clear_layout(self):

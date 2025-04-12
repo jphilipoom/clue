@@ -59,7 +59,14 @@ class BoardTile(QPushButton):
 class BoardScreen(QWidget):
     tile_clicked = pyqtSignal(str)  # Emits the name of the tile clicked
     update_board_signal = pyqtSignal(dict)  # Signal to send selected character name
+    player_turn_signal = pyqtSignal(dict)  # Signal to send selected character name
+
     board_dict = {}
+
+    player_name = None
+
+    def update_name(self, name):
+        player_name = name
 
     # def __init__(self):
     def __init__(self, websocket_thread, main_window):
@@ -68,32 +75,53 @@ class BoardScreen(QWidget):
         super().__init__()
 
         self.tiles = {}  # Dictionary: tile name -> BoardTile
+
+        # Create the layout for the notification bar at the top
+        self.notification_label = QLabel("Welcome to the game!")
+        self.notification_label.setStyleSheet(
+            "background-color: #333; color: white; padding: 5px; font-size: 14px;"
+        )
+
         self.grid_layout = QGridLayout()
-        self.setLayout(self.grid_layout)
         self.grid_layout.setSpacing(0)  # No spacing between cells
         self.grid_layout.setContentsMargins(0, 0, 0, 0)  # No outer padding
 
         self.build_board()
 
+        # Now use a main vertical layout to add the notification bar and board
+        self.main_layout = QVBoxLayout(self)  # Use a vertical layout for everything
+
+        # Add the notification bar at the top
+        self.main_layout.addWidget(self.notification_label)
+
+        # Add the board screen (which is your QGridLayout content)
+        self.main_layout.addLayout(self.grid_layout)
+
+        self.setLayout(self.main_layout)
+
         self.websocket_thread.update_board_signal.connect(self.update_board_dict)
+        self.websocket_thread.player_turn_signal.connect(self.player_turn_dict)
 
     def update_board_dict(self, dictionary):
         """Slot to update the player list based on the server's message."""
-        print("GOT dictionary in board screen!!!")
         self.board_dict = dictionary
-
-        print("keys are: " + str(dictionary.keys()))
 
         for key in dictionary.keys():
             self.update_player_position(key, None, dictionary[key])
 
-        print(dictionary)
-        # valid_moves = dictionary["valid_moves"]
+    def player_turn_dict(self, dictionary):
+        """Slot to update the player list based on the server's message."""
+        self.turn_dict = dictionary
 
-        # self.update_player_position("Miss Scarlet", None, "Study")
-        # self.update_player_position("Colonel Mustard", None, "H1")
-        # self.highlight_valid_moves(valid_moves)
-        # set to board screen
+        if self.turn_dict["current_turn"]:
+            self.notification_label.setText("Your turn! You can pick where to move:")
+            print("my turn!!!!")
+            self.highlight_valid_moves(self.turn_dict["valid_moves"])
+        else:
+            self.notification_label.setText("It is somebody else's turn")
+
+            self.highlight_valid_moves([])
+            print("NOT")
 
     def build_board(self):
         # Define board layout (None = empty cell)
@@ -151,7 +179,3 @@ if __name__ == "__main__":
     board.tile_clicked.connect(lambda name: print("Clicked tile:", name))
 
     sys.exit(app.exec_())
-
-
-# if __name__ == "__main__":
-#     main()

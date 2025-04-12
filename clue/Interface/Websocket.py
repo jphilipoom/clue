@@ -21,6 +21,7 @@ class WebSocketThread(QThread):
     )  # Signal to get selected character name
     choose_player_signal = pyqtSignal(dict)
     update_board_signal = pyqtSignal(dict)  # Signal to update players list
+    player_turn_signal = pyqtSignal(dict)  # Signal to update players list
 
     def __init__(self):
         super().__init__()
@@ -52,8 +53,6 @@ class WebSocketThread(QThread):
                 message_type = message["type"]
 
                 info = message["data"]
-
-                print(info)
 
                 if message_type == "CHOOSE_PLAYER":
                     # Update player list from the server message
@@ -95,9 +94,11 @@ class WebSocketThread(QThread):
                     current_board = info
 
                     if prev_board != current_board:
-                        print("New board!!!!")
                         # draw_board_terminal.draw_board(current_board)
                         prev_board = current_board
+                elif message_type == "PLAYER":
+                    print(info)
+                    self.player_turn_signal.emit(info)
                 ## PLAYER MSG NOTIFYING TURN AND PLAYER INFO
                 # elif message_type == "PLAYER":
                 #     MY_PLAYER = Player(**message["data"])
