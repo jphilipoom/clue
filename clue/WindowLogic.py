@@ -18,6 +18,7 @@ from Interface.LobbyScreen import LobbyScreen
 from Interface.PlayerSelectScreen import PlayerSelectScreen
 from Interface.Player import Player
 from Interface.CardsScreen import CardsScreen
+from Interface.BoardScreen import BoardScreen
 
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
 from PyQt5.QtCore import QTimer, Qt
@@ -26,7 +27,9 @@ from PyQt5.QtCore import QThread, pyqtSignal
 
 
 class MainWindow(QWidget):
-    character_selected_signal = pyqtSignal(str)  # Signal to get selected character name
+    character_selected_signal = pyqtSignal(
+        dict
+    )  # Signal to get selected character name
 
     def __init__(self):
         super().__init__()
@@ -45,6 +48,7 @@ class MainWindow(QWidget):
         self.player_select_screen = PlayerSelectScreen(self.websocket_thread, self)
         self.lobby_screen = LobbyScreen(self.websocket_thread, self)
         self.cards_screen = CardsScreen(self.websocket_thread, self)
+        self.board_screen = BoardScreen(self.websocket_thread, self)
 
         # send data from player select screen to websocket to send update data to server
         self.player_select_screen.character_selected_signal.connect(
@@ -73,7 +77,8 @@ class MainWindow(QWidget):
         # Emit the signal to update the player list AFTER the PlayerSelectScreen is shown
         self.player_select_screen.update_players_signal.emit(simulated_players)
 
-    def on_character_selected(self, character_name):
+    def on_character_selected(self, character_selected_dict):
+        character_name = character_selected_dict["selected_player"]
         self.setWindowTitle(f"Clue - {character_name}")
 
         self.lobby_screen = LobbyScreen(
@@ -89,6 +94,11 @@ class MainWindow(QWidget):
         # Remove the current screen and show the lobby screen
         self.clear_layout()
         self.layout.addWidget(self.cards_screen)
+
+    def show_board_screen(self):
+        # Remove the current screen and show the lobby screen
+        self.clear_layout()
+        self.layout.addWidget(self.board_screen)
 
     def clear_layout(self):
         # Remove all widgets from the layout to clear it for the new screen

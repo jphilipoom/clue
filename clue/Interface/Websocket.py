@@ -6,31 +6,44 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from Interface.Player import Player
 from msgs.messages import ChoosePlayer
 
+# MY_PLAYER: Player
+prev_board = {}
+# prev_cards = {}
+# GAME_OVER = False
+
 
 # WebSocket Thread to handle async communication
 class WebSocketThread(QThread):
     player_list_signal = pyqtSignal(list)  # Signal to pass updated player list to GUI
     start_game_signal = pyqtSignal(bool)  # Signal to notify when game can start
-    character_selected_signal = pyqtSignal(str)  # Signal to get selected character name
+    character_selected_signal = pyqtSignal(
+        dict
+    )  # Signal to get selected character name
     choose_player_signal = pyqtSignal(dict)
+    update_board_signal = pyqtSignal(dict)  # Signal to update players list
 
     def __init__(self):
         super().__init__()
         self.uri = "ws://localhost:8180"  # WebSocket URL
         self.players = []
         self.selected_character = None
+        self.starting_game = False
 
         self.character_selected_signal.connect(self.on_character_selected)
 
-    def on_character_selected(self, character_name):
+    def on_character_selected(self, character_selected_dict):
         print("REC IN WEBSOCKET on char selected")
+
+        character_name = character_selected_dict["selected_player"]
         self.selected_character = character_name  # Save selected character
+        self.starting_game = character_selected_dict["start"]
 
     def run(self):
         # WebSocket connection and event loop
         asyncio.run(self.connect())
 
     async def connect(self):
+        global prev_board
         async with websockets.connect(self.uri) as websocket:
             while True:
                 data = await websocket.recv()
@@ -40,8 +53,9 @@ class WebSocketThread(QThread):
 
                 info = message["data"]
 
+                print(info)
+
                 if message_type == "CHOOSE_PLAYER":
-                    print(message)
                     # Update player list from the server message
                     self.players = [Player(x) for x in info["players"]]
                     self.player_list_signal.emit(self.players)
@@ -67,44 +81,24 @@ class WebSocketThread(QThread):
                         cp = ChoosePlayer(
                             selected_player=chosen_player.name,
                             players=players_without_this,
-                            start=len(players_without_this) < 5,
+                            start=self.starting_game,
                         )
 
                         msg = {"type": "CHOOSE_PLAYER", "data": cp.to_dict()}
-                        print("SENDING TO SERVER:", json.dumps(msg, indent=2))
 
                         await websocket.send(json.dumps(msg))
+                elif message_type == "BOARD":
+                    # print("info is")
+                    # print(info)
+                    self.update_board_signal.emit(info)
 
-                # if message_type == "CHOOSE_PLAYER":
-                #     choose_player = ChoosePlayer(**message["data"])
-                #     print(f'Which of the following suspects would you like to play as?\n{choose_player.players}')
-                #     choose_player.selected_player = await asyncio.to_thread(input,'Please type in your preferred character: ')
+                    current_board = info
 
-                #     while choose_player.selected_player not in choose_player.players:
-                #         print(f'Error: {choose_player.selected_player} is not a valid character.')
-                #         print(f'Which of the following suspects would you like to play as?\n{choose_player.players}')
-                #         choose_player.selected_player = await asyncio.to_thread(input,'Please type in your preferred character: ')
-
-                #     if (len(choose_player.players) < 5):
-                #         choose_player.start = 'y' == await asyncio.to_thread(input,f'There are {6- len(choose_player.players)} other players, would you like to start the game? y/n: ')
-                #     else:
-                #         choose_player.start = False
-
-                #     msg = {
-                #         "type": "CHOOSE_PLAYER",
-                #         "data": choose_player.to_dict()
-                #     }
-                #     await websocket.send(json.dumps(msg))
-
-                #     print("Thank you, waiting for the game to start...")
-                # ## BOARD MESSAGE WITH UPDATED LOCATIONS
-                # elif message_type == "BOARD":
-                #     current_board = message["data"]
-
-                #     if prev_board != current_board:
-                #         draw_board_terminal.draw_board(current_board)
-                #         prev_board = current_board
-                # ## PLAYER MSG NOTIFYING TURN AND PLAYER INFO
+                    if prev_board != current_board:
+                        print("New board!!!!")
+                        # draw_board_terminal.draw_board(current_board)
+                        prev_board = current_board
+                ## PLAYER MSG NOTIFYING TURN AND PLAYER INFO
                 # elif message_type == "PLAYER":
                 #     MY_PLAYER = Player(**message["data"])
                 #     print(MY_PLAYER.name)

@@ -25,9 +25,9 @@ class BoardTile(QPushButton):
         if is_room:
             self.setFixedSize(100, 100)
         elif orientation == "H":
-            self.setFixedSize(100, 40)
+            self.setFixedSize(100, 70)
         elif orientation == "V":
-            self.setFixedSize(40, 100)
+            self.setFixedSize(70, 100)
         else:
             self.setFixedSize(60, 60)  # fallback/default
 
@@ -58,8 +58,13 @@ class BoardTile(QPushButton):
 
 class BoardScreen(QWidget):
     tile_clicked = pyqtSignal(str)  # Emits the name of the tile clicked
+    update_board_signal = pyqtSignal(dict)  # Signal to send selected character name
+    board_dict = {}
 
-    def __init__(self):
+    # def __init__(self):
+    def __init__(self, websocket_thread, main_window):
+        self.main_window = main_window  # Store reference to main window
+        self.websocket_thread = websocket_thread
         super().__init__()
 
         self.tiles = {}  # Dictionary: tile name -> BoardTile
@@ -69,6 +74,26 @@ class BoardScreen(QWidget):
         self.grid_layout.setContentsMargins(0, 0, 0, 0)  # No outer padding
 
         self.build_board()
+
+        self.websocket_thread.update_board_signal.connect(self.update_board_dict)
+
+    def update_board_dict(self, dictionary):
+        """Slot to update the player list based on the server's message."""
+        print("GOT dictionary in board screen!!!")
+        self.board_dict = dictionary
+
+        print("keys are: " + str(dictionary.keys()))
+
+        for key in dictionary.keys():
+            self.update_player_position(key, None, dictionary[key])
+
+        print(dictionary)
+        # valid_moves = dictionary["valid_moves"]
+
+        # self.update_player_position("Miss Scarlet", None, "Study")
+        # self.update_player_position("Colonel Mustard", None, "H1")
+        # self.highlight_valid_moves(valid_moves)
+        # set to board screen
 
     def build_board(self):
         # Define board layout (None = empty cell)
