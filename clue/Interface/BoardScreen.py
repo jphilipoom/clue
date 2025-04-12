@@ -75,6 +75,8 @@ class BoardScreen(QWidget):
     player_accusation_signal = pyqtSignal(dict)
     player_suggestion_signal = pyqtSignal(dict)
 
+    player_response_suggestion_signal = pyqtSignal(dict)
+
     will_move = pyqtSignal(bool)
     will_accuse = pyqtSignal(bool)
     will_suggest = pyqtSignal(bool)
@@ -82,6 +84,7 @@ class BoardScreen(QWidget):
     board_dict = {}
     player_accusation_dict = {}
     player_suggestion_dict = {}
+    suggestion_response_list = []
 
     player_name = None
 
@@ -237,6 +240,13 @@ class BoardScreen(QWidget):
             )
         )
 
+        self.suggestion_button_layout = QVBoxLayout()
+        self.suggestion_button_container = QWidget()
+        self.suggestion_button_container.setLayout(self.suggestion_button_layout)
+
+        # Add to your window or main layout:
+        self.main_layout.addWidget(self.suggestion_button_container)
+
         # Add the board screen (which is your QGridLayout content)
         self.main_layout.addLayout(self.grid_layout)
 
@@ -244,13 +254,16 @@ class BoardScreen(QWidget):
 
         self.websocket_thread.update_board_signal.connect(self.update_board_dict)
         self.websocket_thread.player_turn_signal.connect(self.player_turn_dict)
+        self.websocket_thread.suggestion_response_options_signal.connect(
+            self.suggestion_response_list
+        )
 
     def update_board_dict(self, dictionary):
         """Slot to update the player list based on the server's message."""
         self.board_dict = dictionary
 
         for key in dictionary.keys():
-            self.update_player_position(key, None, dictionary[key])
+            self.update_player_position(key, dictionary[key])
 
     def player_turn_dict(self, dictionary):
         """Slot to update the player list based on the server's message."""
@@ -259,7 +272,9 @@ class BoardScreen(QWidget):
         self.current_loc = dictionary["location"]
 
         if self.turn_dict["current_turn"]:
-            self.notification_label.setText("Your turn!")
+            self.notification_label.setText(
+                f"Your turn!\n Reminder, your cards include:\n{self.turn_dict['cards']}"
+            )
             self.turn_phase = "start"
             self.update_button_vis()
         else:
@@ -300,7 +315,6 @@ class BoardScreen(QWidget):
 
             self.submit_suggestion_button.setVisible(True)
 
-            # TODO: make dropdowns for all suggestion options, then a submit button
         if self.turn_phase == "after_suggest":
             self.accusation_button.setVisible(True)
             self.dont_accusation_button.setVisible(True)
@@ -356,9 +370,13 @@ class BoardScreen(QWidget):
                     self.tiles[name] = tile
                     self.grid_layout.addWidget(tile, row_idx, col_idx)
 
-    def update_player_position(self, player_name, from_tile, to_tile):
-        if from_tile in self.tiles:
-            self.tiles[from_tile].remove_player(player_name)
+    def update_player_position(self, player_name, to_tile):
+        # Remove player from all tiles except the destination
+        for tile_name, tile in self.tiles.items():
+            if tile_name != to_tile:
+                tile.remove_player(player_name)
+
+        # Add player to the destination tile
         if to_tile in self.tiles:
             self.tiles[to_tile].add_player(player_name)
 
@@ -390,6 +408,42 @@ class BoardScreen(QWidget):
 
         self.player_suggestion_signal.emit(msg)
 
+    def suggestion_response_list(self, options):
+        self.notification_label.setText(
+            "It is somebody else's turn. They made a suggestion, what will you respond with?"
+        )
+
+        # Clear any old buttons
+
+        for i in reversed(range(self.suggestion_button_layout.count())):
+            widget = self.suggestion_button_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.setParent(None)
+
+        for option in options:
+            button = QPushButton(option)
+            button.clicked.connect(
+                lambda _, opt=option: self.handle_suggestion_response(opt)
+            )
+            self.suggestion_button_layout.addWidget(button)
+
+    def handle_suggestion_response(self, chosen_option):
+        print("You chose:", chosen_option)
+
+        # Clear all suggestion buttons after one is clicked
+        for i in reversed(range(self.suggestion_button_layout.count())):
+            widget = self.suggestion_button_layout.itemAt(i).widget()
+            if widget is not None:
+                widget.setParent(None)
+
+        self.notification_label.setText("It is somebody else's turn.")
+
+        # Send back to server if needed
+        msg = {"type": "SUGGESTION_RESPONSE", "data": chosen_option}
+
+        print(msg)
+        self.player_response_suggestion_signal.emit(msg)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
@@ -399,8 +453,8 @@ if __name__ == "__main__":
     board.show()
 
     # Example test moves
-    board.update_player_position("Miss Scarlet", None, "Study")
-    board.update_player_position("Colonel Mustard", None, "H1")
+    board.update_player_position("Miss Scarlet", "Study")
+    board.update_player_position("Colonel Mustard", "H1")
     board.highlight_valid_moves(["H3", "H6", "H8"])
 
     # Print clicked tile name

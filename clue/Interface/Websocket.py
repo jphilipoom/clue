@@ -6,7 +6,18 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from Interface.Player import DumbPlayer
 from player import Player
 
-from msgs.messages import ChoosePlayer
+from msgs.messages import (
+    ChoosePlayer,
+    SuggestionResponse,
+    PublicSuggestionResponse,
+    Suggestion,
+    Accusation,
+)
+from player_side_util import (
+    make_suggestion,
+    generate_suggestion_response,
+    make_accusation,
+)
 
 # MY_PLAYER: Player
 prev_board = {}
@@ -29,7 +40,9 @@ class WebSocketThread(QThread):
     # suggestion_signal = pyqtSignal(dict)
     # accusation_signal = pyqtSignal(dict)
 
-    (accusation_value, suggestion_value) = (None, None)
+    suggestion_response_options_signal = pyqtSignal(list)
+
+    (accusation_value, suggestion_value, suggestion_response_value) = (None, None, None)
 
     def __init__(self):
         super().__init__()
@@ -73,6 +86,12 @@ class WebSocketThread(QThread):
         print("value is ")
         print(value)
         print("HANDLING SUGGEST")
+
+    def handle_suggestion_response(self, value):
+        self.suggestion_response_value = value
+        print("value is ")
+        print(value)
+        print("HANDLING SUGGEST RESP")
 
     def run(self):
         # WebSocket connection and event loop
@@ -138,43 +157,36 @@ class WebSocketThread(QThread):
                         # TODO: make sure this doesn't cause stalls when they pick not to move locations
                         # Wait until a location is selected
                         while self.will_move is None:
-                            print("wait")
                             await asyncio.sleep(0.1)
-                        if self.will_move:
+                        if self.will_move is True:
                             while self.tile_move is None:
                                 await asyncio.sleep(0.1)
                             MY_PLAYER.location = self.tile_move
                             msg = {"type": "PLAYER", "data": MY_PLAYER.to_dict()}
-                            print("send move")
                             await websocket.send(json.dumps(msg))
-                        else:
-                            print("not moving")
+
                         while self.will_suggest is None:
-                            print("wait")
                             await asyncio.sleep(0.1)
-                        if self.will_suggest:
+                        if self.will_suggest is True:
                             while self.suggestion_value is None:
                                 await asyncio.sleep(0.1)
-                            print("send sugg")
+
+                            # TODO: need to add code to show the user what the other user showed for their suggestion
 
                             msg = self.suggestion_value
                             await websocket.send(json.dumps(msg))
-                        else:
-                            print("not suggesting")
+
                         while self.will_accuse is None:
                             print("wait")
                             await asyncio.sleep(0.1)
-                        if self.will_accuse:
-                            print("accusing")
+                        if self.will_accuse is True:
                             while self.accusation_value is None:
-                                print("waiting on accus")
                                 await asyncio.sleep(0.1)
                             print("send accus")
 
                             msg = self.accusation_value
                             await websocket.send(json.dumps(msg))
-                        else:
-                            print("not accusing")
+
                         (self.will_move, self.will_suggest, self.will_accuse) = (
                             None,
                             None,
@@ -194,6 +206,73 @@ class WebSocketThread(QThread):
                         msg = {"type": "FINISHED_TURN"}
                         await websocket.send(json.dumps(msg))
 
+                elif message_type == "SUGGESTION":
+                    sugg = Suggestion(**message["data"])
+                    print(
+                        f"{sugg.player}, made a suggestion: Location: {sugg.location}, Weapon: {sugg.weapon}, Suspect: {sugg.suspect}"
+                    )
+                    print(f"Waiting for player responses...")
+                ## SUGGESTION RESPONSE SENT TO ALL PLAYERS
+                elif message_type == "PUBLIC_SUGGESTION_RESPONSE":
+                    pub_sugg_resp = PublicSuggestionResponse(**message["data"])
+                    if pub_sugg_resp.showed_card:
+                        print(
+                            f"Player {pub_sugg_resp.responding_player} showed a card!"
+                        )
+                    else:
+                        print(f"Player {pub_sugg_resp.responding_player} passed!")
+                ## RESPONSE TO CURRENT PLAYER'S SUGGESTION
+                elif message_type == "PRIVATE_SUGGESTION_RESPONSE":
+                    priv_sugg_resp = SuggestionResponse(**message["data"])
+                    if priv_sugg_resp.location != "":
+                        print(
+                            f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.location}"
+                        )
+                    elif priv_sugg_resp.suspect != "":
+                        print(
+                            f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.suspect}"
+                        )
+                    elif priv_sugg_resp.weapon != "":
+                        print(
+                            f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.weapon}"
+                        )
+                elif message_type == "SUGGESTION_RESPONSE":
+                    sugg_resp = SuggestionResponse(**message["data"])
+                    # TODO: replace this text input with some sort of button/option on GUI
+
+                    print("all the data provided in sugg resp")
+                    found_cards = MY_PLAYER.check_accusation(
+                        sugg_resp.weapon, sugg_resp.suspect, sugg_resp.location
+                    )
+
+                    # TODO: add some sort of option when there's literally no cards so the program doesn't just get stuck... or maybe just skip that user?
+                    self.suggestion_response_options_signal.emit(found_cards)
+
+                    # gen_sugg_resp = await generate_suggestion_response(
+                    #     sugg_resp, MY_PLAYER
+                    # )
+                    # msg = {
+                    #     "type": "SUGGESTION_RESPONSE",
+                    #     "data": gen_sugg_resp.to_dict(),
+                    # }
+                    # await websocket.send(json.dumps(msg))
+                ## OTHER PLAYER'S ACCUSATION AND RESULT
+                elif message_type == "ACCUSATION":
+                    acc = Accusation(**message["data"])
+
+                    if acc.correct:
+                        print(
+                            f"{acc.player}, made a CORRECT accusation: Location: {acc.location}, Weapon: {acc.weapon}, Suspect: {acc.suspect}"
+                        )
+                        print("Game over!")
+                        GAME_OVER = True
+                    else:
+                        print(
+                            f"{acc.player}, made an INCORRECT accusation: Location: {acc.location}, Weapon: {acc.weapon}, Suspect: {acc.suspect}"
+                        )
+                        print(f"{acc.player} is now out of the game!")
+
+                # old below this point probably
                 ## PLAYER MSG NOTIFYING TURN AND PLAYER INFO
                 # elif message_type == "PLAYER":
                 #     MY_PLAYER = Player(**message["data"])
@@ -244,59 +323,3 @@ class WebSocketThread(QThread):
                 #                 }
                 #                 await websocket.send(json.dumps(msg))
                 # ## OTHER PLAYER'S SUGGESTION SENT TO ALL PLAYERS
-                # elif message_type == "SUGGESTION":
-                #     sugg = Suggestion(**message["data"])
-                #     print(f'{sugg.player}, made a suggestion: Location: {sugg.location}, Weapon: {sugg.weapon}, Suspect: {sugg.suspect}')
-                #     print(f"Waiting for player responses...")
-                # ## SUGGESTION RESPONSE SENT TO ALL PLAYERS
-                # elif message_type == "PUBLIC_SUGGESTION_RESPONSE":
-                #     pub_sugg_resp = PublicSuggestionResponse(**message["data"])
-                #     if pub_sugg_resp.showed_card:
-                #         print(f"Player {pub_sugg_resp.responding_player} showed a card!")
-                #     else:
-                #         print(f"Player {pub_sugg_resp.responding_player} passed!")
-                # ## RESPONSE TO CURRENT PLAYER'S SUGGESTION
-                # elif message_type == "PRIVATE_SUGGESTION_RESPONSE":
-                #     priv_sugg_resp = SuggestionResponse(**message["data"])
-                #     if priv_sugg_resp.location != "":
-                #         print(f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.location}")
-                #     elif priv_sugg_resp.suspect != "":
-                #         print(f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.suspect}")
-                #     elif priv_sugg_resp.weapon != "":
-                #         print(f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.weapon}")
-
-                #     acc_input = await asyncio.to_thread(input,"Would you like to make an accusation? y/n: ")
-
-                #     if acc_input == 'y':
-                #         room, weapon , suspect = await make_accusation(MY_PLAYER)
-                #         accusation = Accusation(MY_PLAYER.name, room, weapon, suspect, False)
-                #         msg = {
-                #             "type": "ACCUSATION",
-                #             "data": accusation.to_dict()
-                #         }
-                #         await websocket.send(json.dumps(msg))
-                #     else:
-                #         msg = {
-                #         "type": "FINISHED_TURN"
-                #         }
-                #         await websocket.send(json.dumps(msg))
-                # ## CURRENT PLAYER'S REPSONSE TO OTHER PLAYER'S SUGGESTION
-                # elif message_type == "SUGGESTION_RESPONSE":
-                #     sugg_resp = SuggestionResponse(**message["data"])
-                #     gen_sugg_resp = await generate_suggestion_response(sugg_resp, MY_PLAYER)
-                #     msg = {
-                #         "type": "SUGGESTION_RESPONSE",
-                #         "data": gen_sugg_resp.to_dict()
-                #     }
-                #     await websocket.send(json.dumps(msg))
-                # ## OTHER PLAYER'S ACCUSATION AND RESULT
-                # elif message_type == "ACCUSATION":
-                #     acc = Accusation(**message["data"])
-
-                #     if acc.correct:
-                #         print(f'{acc.player}, made a CORRECT accusation: Location: {acc.location}, Weapon: {acc.weapon}, Suspect: {acc.suspect}')
-                #         print("Game over!")
-                #         GAME_OVER = True
-                #     else:
-                #         print(f'{acc.player}, made an INCORRECT accusation: Location: {acc.location}, Weapon: {acc.weapon}, Suspect: {acc.suspect}')
-                #         print(f"{acc.player} is now out of the game!")

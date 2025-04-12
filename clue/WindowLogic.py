@@ -72,6 +72,10 @@ class MainWindow(QWidget):
             self.websocket_thread.handle_suggestion
         )
 
+        self.board_screen.player_response_suggestion_signal.connect(
+            self.websocket_thread.handle_suggestion_response
+        )
+
         # Initially show the start screen
         self.layout.addWidget(self.start_screen)
 
