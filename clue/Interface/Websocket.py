@@ -26,6 +26,10 @@ class WebSocketThread(QThread):
     update_board_signal = pyqtSignal(dict)  # Signal to update players list
     player_turn_signal = pyqtSignal(dict)  # Signal to update players list
     tile_clicked = pyqtSignal(str)  # Signal to get selected character name
+    # suggestion_signal = pyqtSignal(dict)
+    # accusation_signal = pyqtSignal(dict)
+
+    (accusation_value, suggestion_value) = (None, None)
 
     def __init__(self):
         super().__init__()
@@ -36,18 +40,39 @@ class WebSocketThread(QThread):
 
         self.tile_move = None
 
-        self.character_selected_signal.connect(self.on_character_selected)
+        # self.accusation_signal.connect(self.handle_accusation)
+        # self.suggestion_signal.connect(self.handle_suggestion)
+
         self.tile_clicked.connect(self.on_character_moved)
 
     def on_character_selected(self, character_selected_dict):
-        print("REC IN WEBSOCKET on char selected")
-
         character_name = character_selected_dict["selected_player"]
         self.selected_character = character_name  # Save selected character
         self.starting_game = character_selected_dict["start"]
 
     def on_character_moved(self, move_loc):
         print("MOVED IN WEBSOCKET REC " + move_loc)
+        self.tile_move = move_loc
+
+    def will_accuse(self, value):
+        print("will 3")
+        self.will_accuse = value
+
+    def will_suggest(self, value):
+        self.will_suggest = value
+
+    def will_move(self, value):
+        self.will_move = value
+
+    def handle_accusation(self, value):
+        self.accusation_value = value
+        print("HANDLING ACCUS")
+
+    def handle_suggestion(self, value):
+        self.suggestion_value = value
+        print("value is ")
+        print(value)
+        print("HANDLING SUGGEST")
 
     def run(self):
         # WebSocket connection and event loop
@@ -97,8 +122,6 @@ class WebSocketThread(QThread):
 
                         await websocket.send(json.dumps(msg))
                 elif message_type == "BOARD":
-                    # print("info is")
-                    # print(info)
                     self.update_board_signal.emit(info)
 
                     current_board = info
@@ -114,10 +137,61 @@ class WebSocketThread(QThread):
                     if MY_PLAYER.current_turn:
                         # TODO: make sure this doesn't cause stalls when they pick not to move locations
                         # Wait until a location is selected
-                        while self.tile_move is None:
+                        while self.will_move is None:
+                            print("wait")
                             await asyncio.sleep(0.1)
-                        MY_PLAYER.location = self.tile_move
-                        msg = {"type": "PLAYER", "data": MY_PLAYER.to_dict()}
+                        if self.will_move:
+                            while self.tile_move is None:
+                                await asyncio.sleep(0.1)
+                            MY_PLAYER.location = self.tile_move
+                            msg = {"type": "PLAYER", "data": MY_PLAYER.to_dict()}
+                            print("send move")
+                            await websocket.send(json.dumps(msg))
+                        else:
+                            print("not moving")
+                        while self.will_suggest is None:
+                            print("wait")
+                            await asyncio.sleep(0.1)
+                        if self.will_suggest:
+                            while self.suggestion_value is None:
+                                await asyncio.sleep(0.1)
+                            print("send sugg")
+
+                            msg = self.suggestion_value
+                            await websocket.send(json.dumps(msg))
+                        else:
+                            print("not suggesting")
+                        while self.will_accuse is None:
+                            print("wait")
+                            await asyncio.sleep(0.1)
+                        if self.will_accuse:
+                            print("accusing")
+                            while self.accusation_value is None:
+                                print("waiting on accus")
+                                await asyncio.sleep(0.1)
+                            print("send accus")
+
+                            msg = self.accusation_value
+                            await websocket.send(json.dumps(msg))
+                        else:
+                            print("not accusing")
+                        (self.will_move, self.will_suggest, self.will_accuse) = (
+                            None,
+                            None,
+                            None,
+                        )
+                        (
+                            self.accusation_value,
+                            self.suggestion_value,
+                            self.tile_move,
+                        ) = (
+                            None,
+                            None,
+                            None,
+                        )
+
+                        print("MY TURN IS NOW OVER")
+                        msg = {"type": "FINISHED_TURN"}
                         await websocket.send(json.dumps(msg))
 
                 ## PLAYER MSG NOTIFYING TURN AND PLAYER INFO

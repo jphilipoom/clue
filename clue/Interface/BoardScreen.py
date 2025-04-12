@@ -13,6 +13,17 @@ from PyQt5.QtWidgets import (
 
 from PyQt5.QtWidgets import QWidget, QGridLayout, QVBoxLayout
 from PyQt5.QtCore import pyqtSignal
+from asyncio import run_coroutine_threadsafe
+
+from server_side_util import (
+    # Player,
+    SUSPECTS,
+    ROOMS,
+    WEAPONS,
+    LOCATIONS,
+)
+
+from msgs.messages import Suggestion, Accusation
 
 
 class BoardTile(QPushButton):
@@ -61,7 +72,16 @@ class BoardScreen(QWidget):
     update_board_signal = pyqtSignal(dict)  # Signal to send selected character name
     player_turn_signal = pyqtSignal(dict)  # Signal to send selected character name
 
+    player_accusation_signal = pyqtSignal(dict)
+    player_suggestion_signal = pyqtSignal(dict)
+
+    will_move = pyqtSignal(bool)
+    will_accuse = pyqtSignal(bool)
+    will_suggest = pyqtSignal(bool)
+
     board_dict = {}
+    player_accusation_dict = {}
+    player_suggestion_dict = {}
 
     player_name = None
 
@@ -87,37 +107,81 @@ class BoardScreen(QWidget):
 
         self.move_button = QPushButton("Move")
         self.move_button.clicked.connect(
-            lambda: (setattr(self, "turn_phase", "move"), self.update_button_vis()),
+            lambda: (
+                setattr(self, "turn_phase", "move"),
+                self.update_button_vis(),
+                self.will_move.emit(True),
+            ),
         )
         self.dont_move_button = QPushButton("Don't")
         self.dont_move_button.clicked.connect(
             lambda: (
                 setattr(self, "turn_phase", "after_move"),
                 self.update_button_vis(),
+                self.will_move.emit(False),
             ),
         )
 
         self.suggestion_button = QPushButton("Suggestion")
         self.suggestion_button.clicked.connect(
-            lambda: (setattr(self, "turn_phase", "suggest"), self.update_button_vis()),
+            lambda: (
+                setattr(self, "turn_phase", "suggest"),
+                self.update_button_vis(),
+                self.will_suggest.emit(True),
+            ),
         )
+
+        self.suggestion_suspect_box = QComboBox()
+        self.suggestion_suspect_box.addItems(SUSPECTS)
+
+        self.suggestion_weapons_box = QComboBox()
+        self.suggestion_weapons_box.addItems(WEAPONS)
+
         self.dont_suggestion_button = QPushButton("Don't")
         self.dont_suggestion_button.clicked.connect(
             lambda: (
                 setattr(self, "turn_phase", "after_suggest"),
                 self.update_button_vis(),
+                self.will_suggest.emit(False),
+            ),
+        )
+
+        self.submit_suggestion_button = QPushButton("Submit Suggestion")
+        self.submit_suggestion_button.clicked.connect(
+            lambda: (
+                setattr(self, "turn_phase", "after_suggest"),
+                self.update_button_vis(),
+                self.sendSuggestion(),
             ),
         )
 
         self.accusation_button = QPushButton("Accusation")
         self.accusation_button.clicked.connect(
-            lambda: (setattr(self, "turn_phase", "accuse"), self.update_button_vis()),
+            lambda: (
+                setattr(self, "turn_phase", "accuse"),
+                self.update_button_vis(),
+                self.will_accuse.emit(True),
+            ),
         )
+
+        self.accusation_location_box = QComboBox()
+        self.accusation_location_box.addItems(LOCATIONS)
+
         self.dont_accusation_button = QPushButton("Don't")
         self.dont_accusation_button.clicked.connect(
             lambda: (
                 setattr(self, "turn_phase", "after_accusation"),
                 self.update_button_vis(),
+                self.will_accuse.emit(False),
+            ),
+        )
+
+        self.submit_accusation_button = QPushButton("Submit Accusation")
+        self.submit_accusation_button.clicked.connect(
+            lambda: (
+                setattr(self, "turn_phase", "after_accusation"),
+                self.update_button_vis(),
+                self.sendAccusation(),
             ),
         )
 
@@ -133,17 +197,36 @@ class BoardScreen(QWidget):
         # Add the notification bar at the top
         self.main_layout.addWidget(self.notification_label)
 
-        buttons = [
+        self.buttons = [
             self.move_button,
             self.dont_move_button,
             self.suggestion_button,
             self.dont_suggestion_button,
+            self.submit_suggestion_button,
             self.accusation_button,
             self.dont_accusation_button,
+            self.submit_accusation_button,
         ]
 
-        [self.main_layout.addWidget(button) for button in buttons]
-        [button.setVisible(False) for button in buttons]
+        [self.main_layout.addWidget(button) for button in self.buttons]
+        [button.setVisible(False) for button in self.buttons]
+
+        [
+            self.main_layout.addWidget(dropdown)
+            for dropdown in [
+                self.accusation_location_box,
+                self.suggestion_suspect_box,
+                self.suggestion_weapons_box,
+            ]
+        ]
+        [
+            dropdown.setVisible(False)
+            for dropdown in [
+                self.accusation_location_box,
+                self.suggestion_suspect_box,
+                self.suggestion_weapons_box,
+            ]
+        ]
 
         self.tile_clicked.connect(
             lambda name: (
@@ -186,16 +269,8 @@ class BoardScreen(QWidget):
             print("NOT")
 
     def update_button_vis(self):
-        buttons = [
-            self.move_button,
-            self.dont_move_button,
-            self.suggestion_button,
-            self.dont_suggestion_button,
-            self.accusation_button,
-            self.dont_accusation_button,
-        ]
 
-        [button.setVisible(False) for button in buttons]
+        [button.setVisible(False) for button in self.buttons]
 
         if self.turn_phase == "start":
             self.move_button.setVisible(True)
@@ -215,16 +290,41 @@ class BoardScreen(QWidget):
                 self.turn_phase = "after_suggest"
                 self.update_button_vis()
         if self.turn_phase == "suggest":
-            print("suggest!!")
+            [
+                dropdown.setVisible(True)
+                for dropdown in [
+                    self.suggestion_suspect_box,
+                    self.suggestion_weapons_box,
+                ]
+            ]
+
+            self.submit_suggestion_button.setVisible(True)
+
             # TODO: make dropdowns for all suggestion options, then a submit button
         if self.turn_phase == "after_suggest":
             self.accusation_button.setVisible(True)
             self.dont_accusation_button.setVisible(True)
         if self.turn_phase == "accuse":
-            # TODO: similar to suggestion, need dropdowns for all options then a submit button
-            print("accuse!!")
+            [
+                dropdown.setVisible(True)
+                for dropdown in [
+                    self.accusation_location_box,
+                    self.suggestion_suspect_box,
+                    self.suggestion_weapons_box,
+                ]
+            ]
+            self.submit_accusation_button.setVisible(True)
 
         if self.turn_phase == "after_accusation":
+            [
+                dropdown.setVisible(False)
+                for dropdown in [
+                    self.accusation_location_box,
+                    self.suggestion_suspect_box,
+                    self.suggestion_weapons_box,
+                ]
+            ]
+
             self.turn_phase = "done"
 
     def build_board(self):
@@ -265,6 +365,30 @@ class BoardScreen(QWidget):
     def highlight_valid_moves(self, valid_tile_names):
         for name, tile in self.tiles.items():
             tile.set_active(name in valid_tile_names)
+
+    def sendAccusation(self):
+        suspect = self.suggestion_suspect_box.currentText()
+        weapon = self.suggestion_weapons_box.currentText()
+        location = self.accusation_location_box.currentText()
+
+        accusation = Accusation(
+            self.player_name, location, weapon, suspect=suspect, correct=False
+        )
+        msg = {"type": "ACCUSATION", "data": accusation.to_dict()}
+
+        self.player_accusation_signal.emit(msg)
+
+    def sendSuggestion(self):
+        suspect = self.suggestion_suspect_box.currentText()
+        weapon = self.suggestion_weapons_box.currentText()
+
+        suggestion = Suggestion(
+            self.player_name, self.current_loc, weapon, suspect=suspect
+        )
+
+        msg = {"type": "SUGGESTION", "data": suggestion.to_dict()}
+
+        self.player_suggestion_signal.emit(msg)
 
 
 if __name__ == "__main__":

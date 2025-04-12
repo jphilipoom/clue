@@ -60,6 +60,17 @@ class MainWindow(QWidget):
         )
 
         self.board_screen.tile_clicked.connect(self.websocket_thread.on_character_moved)
+        self.board_screen.will_accuse.connect(self.websocket_thread.will_accuse)
+        self.board_screen.will_suggest.connect(self.websocket_thread.will_suggest)
+        self.board_screen.will_move.connect(self.websocket_thread.will_move)
+
+        self.board_screen.player_accusation_signal.connect(
+            self.websocket_thread.handle_accusation
+        )
+
+        self.board_screen.player_suggestion_signal.connect(
+            self.websocket_thread.handle_suggestion
+        )
 
         # Initially show the start screen
         self.layout.addWidget(self.start_screen)
