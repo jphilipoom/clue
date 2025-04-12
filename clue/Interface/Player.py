@@ -1,5 +1,5 @@
 # Simulate the Player class (server-side player data).
-class Player:
+class DumbPlayer:
     def __init__(self, name):
         self.name = name
 

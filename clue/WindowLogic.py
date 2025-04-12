@@ -16,7 +16,7 @@ from Interface.Websocket import WebSocketThread
 from Interface.StartScreen import StartScreen
 from Interface.LobbyScreen import LobbyScreen
 from Interface.PlayerSelectScreen import PlayerSelectScreen
-from Interface.Player import Player
+from Interface.Player import DumbPlayer
 from Interface.CardsScreen import CardsScreen
 from Interface.BoardScreen import BoardScreen
 
@@ -59,6 +59,8 @@ class MainWindow(QWidget):
             self.on_character_selected
         )
 
+        self.board_screen.tile_clicked.connect(self.websocket_thread.on_character_moved)
+
         # Initially show the start screen
         self.layout.addWidget(self.start_screen)
 
@@ -69,9 +71,9 @@ class MainWindow(QWidget):
 
         # Simulate receiving the player list from the server
         simulated_players = [
-            Player("Dumb"),
-            Player("Two"),
-            Player("Three"),
+            DumbPlayer("Dumb"),
+            DumbPlayer("Two"),
+            DumbPlayer("Three"),
         ]
 
         # Emit the signal to update the player list AFTER the PlayerSelectScreen is shown

@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 )
 
 
+# TODO: this isn't actually showing yet - need to add it as a part of the board screen or determine what to do with it
 class CardsScreen(QWidget):
 
     def __init__(self, websocket_thread, main_window):

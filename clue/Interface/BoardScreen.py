@@ -66,6 +66,7 @@ class BoardScreen(QWidget):
     player_name = None
 
     turn_phase = None
+    current_loc = None
 
     def update_name(self, name):
         player_name = name
@@ -144,6 +145,15 @@ class BoardScreen(QWidget):
         [self.main_layout.addWidget(button) for button in buttons]
         [button.setVisible(False) for button in buttons]
 
+        self.tile_clicked.connect(
+            lambda name: (
+                # print("Clicked tile:", name),
+                setattr(self, "current_loc", name),
+                setattr(self, "turn_phase", "after_move"),
+                self.update_button_vis(),
+            )
+        )
+
         # Add the board screen (which is your QGridLayout content)
         self.main_layout.addLayout(self.grid_layout)
 
@@ -163,12 +173,12 @@ class BoardScreen(QWidget):
         """Slot to update the player list based on the server's message."""
         self.turn_dict = dictionary
 
+        self.current_loc = dictionary["location"]
+
         if self.turn_dict["current_turn"]:
-            self.notification_label.setText("Your turn! You can pick where to move:")
-            print("my turn!!!!")
+            self.notification_label.setText("Your turn!")
             self.turn_phase = "start"
             self.update_button_vis()
-            # self.highlight_valid_moves(self.turn_dict["valid_moves"])
         else:
             self.notification_label.setText("It is somebody else's turn")
 
@@ -193,14 +203,25 @@ class BoardScreen(QWidget):
         if self.turn_phase == "move":
             self.highlight_valid_moves(self.turn_dict["valid_moves"])
         if self.turn_phase == "after_move":
-            self.suggestion_button.setVisible(True)
-            self.dont_suggestion_button.setVisible(True)
+            self.highlight_valid_moves([])
+
+            # Check in valid room to be making a suggestion
+            if not (
+                self.current_loc.startswith("H") and self.current_loc[1:].isdigit()
+            ):
+                self.suggestion_button.setVisible(True)
+                self.dont_suggestion_button.setVisible(True)
+            else:
+                self.turn_phase = "after_suggest"
+                self.update_button_vis()
         if self.turn_phase == "suggest":
             print("suggest!!")
+            # TODO: make dropdowns for all suggestion options, then a submit button
         if self.turn_phase == "after_suggest":
             self.accusation_button.setVisible(True)
             self.dont_accusation_button.setVisible(True)
         if self.turn_phase == "accuse":
+            # TODO: similar to suggestion, need dropdowns for all options then a submit button
             print("accuse!!")
 
         if self.turn_phase == "after_accusation":
@@ -259,6 +280,6 @@ if __name__ == "__main__":
     board.highlight_valid_moves(["H3", "H6", "H8"])
 
     # Print clicked tile name
-    board.tile_clicked.connect(lambda name: print("Clicked tile:", name))
+    # board.tile_clicked.connect(lambda name: print("Clicked tile:", name))
 
     sys.exit(app.exec_())

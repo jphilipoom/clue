@@ -3,7 +3,9 @@ import websockets
 import json
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from Interface.Player import Player
+from Interface.Player import DumbPlayer
+from player import Player
+
 from msgs.messages import ChoosePlayer
 
 # MY_PLAYER: Player
@@ -12,6 +14,7 @@ prev_board = {}
 # GAME_OVER = False
 
 
+# TODO: need to add in the stuff
 # WebSocket Thread to handle async communication
 class WebSocketThread(QThread):
     player_list_signal = pyqtSignal(list)  # Signal to pass updated player list to GUI
@@ -22,6 +25,7 @@ class WebSocketThread(QThread):
     choose_player_signal = pyqtSignal(dict)
     update_board_signal = pyqtSignal(dict)  # Signal to update players list
     player_turn_signal = pyqtSignal(dict)  # Signal to update players list
+    tile_clicked = pyqtSignal(str)  # Signal to get selected character name
 
     def __init__(self):
         super().__init__()
@@ -30,7 +34,10 @@ class WebSocketThread(QThread):
         self.selected_character = None
         self.starting_game = False
 
+        self.tile_move = None
+
         self.character_selected_signal.connect(self.on_character_selected)
+        self.tile_clicked.connect(self.on_character_moved)
 
     def on_character_selected(self, character_selected_dict):
         print("REC IN WEBSOCKET on char selected")
@@ -38,6 +45,9 @@ class WebSocketThread(QThread):
         character_name = character_selected_dict["selected_player"]
         self.selected_character = character_name  # Save selected character
         self.starting_game = character_selected_dict["start"]
+
+    def on_character_moved(self, move_loc):
+        print("MOVED IN WEBSOCKET REC " + move_loc)
 
     def run(self):
         # WebSocket connection and event loop
@@ -56,7 +66,7 @@ class WebSocketThread(QThread):
 
                 if message_type == "CHOOSE_PLAYER":
                     # Update player list from the server message
-                    self.players = [Player(x) for x in info["players"]]
+                    self.players = [DumbPlayer(x) for x in info["players"]]
                     self.player_list_signal.emit(self.players)
                     self.choose_player_signal.emit(info)
 
@@ -98,7 +108,18 @@ class WebSocketThread(QThread):
                         prev_board = current_board
                 elif message_type == "PLAYER":
                     print(info)
+                    MY_PLAYER = Player(**message["data"])
                     self.player_turn_signal.emit(info)
+
+                    if MY_PLAYER.current_turn:
+                        # TODO: make sure this doesn't cause stalls when they pick not to move locations
+                        # Wait until a location is selected
+                        while self.tile_move is None:
+                            await asyncio.sleep(0.1)
+                        MY_PLAYER.location = self.tile_move
+                        msg = {"type": "PLAYER", "data": MY_PLAYER.to_dict()}
+                        await websocket.send(json.dumps(msg))
+
                 ## PLAYER MSG NOTIFYING TURN AND PLAYER INFO
                 # elif message_type == "PLAYER":
                 #     MY_PLAYER = Player(**message["data"])
