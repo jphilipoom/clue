@@ -65,6 +65,8 @@ class BoardScreen(QWidget):
 
     player_name = None
 
+    turn_phase = None
+
     def update_name(self, name):
         player_name = name
 
@@ -82,6 +84,42 @@ class BoardScreen(QWidget):
             "background-color: #333; color: white; padding: 5px; font-size: 14px;"
         )
 
+        self.move_button = QPushButton("Move")
+        self.move_button.clicked.connect(
+            lambda: (setattr(self, "turn_phase", "move"), self.update_button_vis()),
+        )
+        self.dont_move_button = QPushButton("Don't")
+        self.dont_move_button.clicked.connect(
+            lambda: (
+                setattr(self, "turn_phase", "after_move"),
+                self.update_button_vis(),
+            ),
+        )
+
+        self.suggestion_button = QPushButton("Suggestion")
+        self.suggestion_button.clicked.connect(
+            lambda: (setattr(self, "turn_phase", "suggest"), self.update_button_vis()),
+        )
+        self.dont_suggestion_button = QPushButton("Don't")
+        self.dont_suggestion_button.clicked.connect(
+            lambda: (
+                setattr(self, "turn_phase", "after_suggest"),
+                self.update_button_vis(),
+            ),
+        )
+
+        self.accusation_button = QPushButton("Accusation")
+        self.accusation_button.clicked.connect(
+            lambda: (setattr(self, "turn_phase", "accuse"), self.update_button_vis()),
+        )
+        self.dont_accusation_button = QPushButton("Don't")
+        self.dont_accusation_button.clicked.connect(
+            lambda: (
+                setattr(self, "turn_phase", "after_accusation"),
+                self.update_button_vis(),
+            ),
+        )
+
         self.grid_layout = QGridLayout()
         self.grid_layout.setSpacing(0)  # No spacing between cells
         self.grid_layout.setContentsMargins(0, 0, 0, 0)  # No outer padding
@@ -93,6 +131,18 @@ class BoardScreen(QWidget):
 
         # Add the notification bar at the top
         self.main_layout.addWidget(self.notification_label)
+
+        buttons = [
+            self.move_button,
+            self.dont_move_button,
+            self.suggestion_button,
+            self.dont_suggestion_button,
+            self.accusation_button,
+            self.dont_accusation_button,
+        ]
+
+        [self.main_layout.addWidget(button) for button in buttons]
+        [button.setVisible(False) for button in buttons]
 
         # Add the board screen (which is your QGridLayout content)
         self.main_layout.addLayout(self.grid_layout)
@@ -116,12 +166,45 @@ class BoardScreen(QWidget):
         if self.turn_dict["current_turn"]:
             self.notification_label.setText("Your turn! You can pick where to move:")
             print("my turn!!!!")
-            self.highlight_valid_moves(self.turn_dict["valid_moves"])
+            self.turn_phase = "start"
+            self.update_button_vis()
+            # self.highlight_valid_moves(self.turn_dict["valid_moves"])
         else:
             self.notification_label.setText("It is somebody else's turn")
 
             self.highlight_valid_moves([])
             print("NOT")
+
+    def update_button_vis(self):
+        buttons = [
+            self.move_button,
+            self.dont_move_button,
+            self.suggestion_button,
+            self.dont_suggestion_button,
+            self.accusation_button,
+            self.dont_accusation_button,
+        ]
+
+        [button.setVisible(False) for button in buttons]
+
+        if self.turn_phase == "start":
+            self.move_button.setVisible(True)
+            self.dont_move_button.setVisible(True)
+        if self.turn_phase == "move":
+            self.highlight_valid_moves(self.turn_dict["valid_moves"])
+        if self.turn_phase == "after_move":
+            self.suggestion_button.setVisible(True)
+            self.dont_suggestion_button.setVisible(True)
+        if self.turn_phase == "suggest":
+            print("suggest!!")
+        if self.turn_phase == "after_suggest":
+            self.accusation_button.setVisible(True)
+            self.dont_accusation_button.setVisible(True)
+        if self.turn_phase == "accuse":
+            print("accuse!!")
+
+        if self.turn_phase == "after_accusation":
+            self.turn_phase = "done"
 
     def build_board(self):
         # Define board layout (None = empty cell)
