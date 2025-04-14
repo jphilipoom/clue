@@ -128,6 +128,7 @@ class WebSocketThread(QThread):
                         msg = {"type": "CHOOSE_PLAYER", "data": cp.to_dict()}
 
                         await websocket.send(json.dumps(msg))
+                # Note: this will only trigger the new board layout
                 elif message_type == "BOARD":
                     self.update_board_signal.emit(info)
 
@@ -136,71 +137,84 @@ class WebSocketThread(QThread):
                     if prev_board != current_board:
                         # draw_board_terminal.draw_board(current_board)
                         prev_board = current_board
+                # Note: this will trigger requests for if the player wants to move and/or make a suggestion
                 elif message_type == "PLAYER":
                     print(info)
                     MY_PLAYER = Player(**message["data"])
                     self.player_turn_signal.emit(info)
 
                     if MY_PLAYER.current_turn:
-                        # TODO: make sure this doesn't cause stalls when they pick not to move locations
-                        # Wait until a location is selected
-                        while self.will_move is None:
-                            await asyncio.sleep(0.1)
-                        if self.will_move is True:
-                            while self.tile_move is None:
-                                await asyncio.sleep(0.1)
-                            MY_PLAYER.location = self.tile_move
-                            msg = {"type": "PLAYER", "data": MY_PLAYER.to_dict()}
+
+                        # skip_turns is True if the oplayer failed an accusation, this will skip their turn everytime since they are out of the game
+                        if MY_PLAYER.skip_turns:
+                            msg = {
+                                "type": "FINISHED_TURN"
+                            }
                             await websocket.send(json.dumps(msg))
-
-                        while self.will_suggest is None:
-                            await asyncio.sleep(0.1)
-                        if self.will_suggest is True:
-                            while self.suggestion_value is None:
+                        else:
+                            # TODO: make sure this doesn't cause stalls when they pick not to move locations
+                            # Wait until a location is selected
+                            while self.will_move is None:
                                 await asyncio.sleep(0.1)
+                            if self.will_move is True:
+                                while self.tile_move is None:
+                                    await asyncio.sleep(0.1)
+                                MY_PLAYER.location = self.tile_move
+                                msg = {"type": "PLAYER", "data": MY_PLAYER.to_dict()}
+                                await websocket.send(json.dumps(msg))
 
-                            # TODO: need to add code to show the user what the other user showed for their suggestion
-
-                            msg = self.suggestion_value
-                            await websocket.send(json.dumps(msg))
-
-                        while self.will_accuse is None:
-                            print("wait")
-                            await asyncio.sleep(0.1)
-                        if self.will_accuse is True:
-                            while self.accusation_value is None:
+                            while self.will_suggest is None:
                                 await asyncio.sleep(0.1)
-                            print("send accus")
+                            if self.will_suggest is True:
+                                while self.suggestion_value is None:
+                                    await asyncio.sleep(0.1)
 
-                            msg = self.accusation_value
-                            await websocket.send(json.dumps(msg))
+                                msg = self.suggestion_value
+                                # send suggestion to server, server will then first broadcast suggestion info, then privately ask players for sugg response
+                                await websocket.send(json.dumps(msg))
+                            else:
+                                print("MY TURN IS NOW OVER")
+                                msg = {"type": "FINISHED_TURN"}
+                                await websocket.send(json.dumps(msg))
 
-                        (self.will_move, self.will_suggest, self.will_accuse) = (
-                            None,
-                            None,
-                            None,
-                        )
-                        (
-                            self.accusation_value,
-                            self.suggestion_value,
-                            self.tile_move,
-                        ) = (
-                            None,
-                            None,
-                            None,
-                        )
+                        # while self.will_accuse is None:
+                        #     print("wait")
+                        #     await asyncio.sleep(0.1)
+                        # if self.will_accuse is True:
+                        #     while self.accusation_value is None:
+                        #         await asyncio.sleep(0.1)
+                        #     print("send accus")
 
-                        print("MY TURN IS NOW OVER")
-                        msg = {"type": "FINISHED_TURN"}
-                        await websocket.send(json.dumps(msg))
+                        #     msg = self.accusation_value
+                        #     await websocket.send(json.dumps(msg))
 
+                        # (self.will_move, self.will_suggest, self.will_accuse) = (
+                        #     None,
+                        #     None,
+                        #     None,
+                        # )
+                        # (
+                        #     self.accusation_value,
+                        #     self.suggestion_value,
+                        #     self.tile_move,
+                        # ) = (
+                        #     None,
+                        #     None,
+                        #     None,
+                        # )
+
+                        # print("MY TURN IS NOW OVER")
+                        # msg = {"type": "FINISHED_TURN"}
+                        # await websocket.send(json.dumps(msg))
+
+                # this is the public broadcast of suggestion info (Note: this will not trigger any actions)
                 elif message_type == "SUGGESTION":
                     sugg = Suggestion(**message["data"])
                     print(
                         f"{sugg.player}, made a suggestion: Location: {sugg.location}, Weapon: {sugg.weapon}, Suspect: {sugg.suspect}"
                     )
                     print(f"Waiting for player responses...")
-                ## SUGGESTION RESPONSE SENT TO ALL PLAYERS
+                ## SUGGESTION RESPONSE SENT TO ALL PLAYERS (Note: this will not trigger any actions)
                 elif message_type == "PUBLIC_SUGGESTION_RESPONSE":
                     pub_sugg_resp = PublicSuggestionResponse(**message["data"])
                     if pub_sugg_resp.showed_card:
@@ -209,7 +223,8 @@ class WebSocketThread(QThread):
                         )
                     else:
                         print(f"Player {pub_sugg_resp.responding_player} passed!")
-                ## RESPONSE TO CURRENT PLAYER'S SUGGESTION
+
+                ## RESPONSE TO CURRENT PLAYER'S SUGGESTION (Note: This will trigger the accusation request action)
                 elif message_type == "PRIVATE_SUGGESTION_RESPONSE":
                     priv_sugg_resp = SuggestionResponse(**message["data"])
                     if priv_sugg_resp.location != "":
@@ -224,6 +239,27 @@ class WebSocketThread(QThread):
                         print(
                             f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.weapon}"
                         )
+                    # Note: if all fields  are "" then all players passed
+
+                    # TODO
+                    # At this point the player who made the initial suggestion, will have the result of their suggestion (a player showed card or all players passed)
+                    # This is where you want to ask if they want to make accusation or not and send the result to server
+                    while self.will_accuse is None:
+                            print("wait")
+                            await asyncio.sleep(0.1)
+                        if self.will_accuse is True:
+                            while self.accusation_value is None:
+                                await asyncio.sleep(0.1)
+                            print("send accus")
+
+                            msg = self.accusation_value
+                            await websocket.send(json.dumps(msg))
+                        else:
+                            print("MY TURN IS NOW OVER")
+                            msg = {"type": "FINISHED_TURN"}
+                            await websocket.send(json.dumps(msg))
+
+                # This is asking the current player to show their card if present in the suggestion (Note: this will trigger the suggestion response action)
                 elif message_type == "SUGGESTION_RESPONSE":
                     sugg_resp = SuggestionResponse(**message["data"])
                     # TODO: replace this text input with some sort of button/option on GUI
@@ -233,18 +269,19 @@ class WebSocketThread(QThread):
                         sugg_resp.weapon, sugg_resp.suspect, sugg_resp.location
                     )
 
-                    # TODO: add some sort of option when there's literally no cards so the program doesn't just get stuck... or maybe just skip that user?
-                    self.suggestion_response_options_signal.emit(found_cards)
+                    # start with an empty suggestion
+                    resp = SuggestionResponse(suggestion.player, "","","",curr_player.name)
 
-                    # gen_sugg_resp = await generate_suggestion_response(
-                    #     sugg_resp, MY_PLAYER
-                    # )
-                    # msg = {
-                    #     "type": "SUGGESTION_RESPONSE",
-                    #     "data": gen_sugg_resp.to_dict(),
-                    # }
-                    # await websocket.send(json.dumps(msg))
-                ## OTHER PLAYER'S ACCUSATION AND RESULT
+                    # If the current player does not have any matching cards in suggestion, send an empty suggestion to the server,
+                    # this will let the server know to ask the next player
+                    if len(found_cards) == 0:
+                        msg = {"type": "SUGGESTION_RESPONSE", "data": resp.to_dict()}
+                        await websocket.send(json.dumps(msg))
+                    else:
+                        self.suggestion_response_options_signal.emit(found_cards)
+                        # TODO fill in the empty suggestion with whatever card the player chooses to show and send this to the server
+
+                ## OTHER PLAYER'S ACCUSATION AND RESULT (Everyone gets this even the player who made the accusation Note: this will not trigger any actions)
                 elif message_type == "ACCUSATION":
                     acc = Accusation(**message["data"])
 
