@@ -23,7 +23,12 @@ from server_side_util import (
     LOCATIONS,
 )
 
-from msgs.messages import Suggestion, Accusation
+from msgs.messages import (
+    Suggestion,
+    Accusation,
+    PublicSuggestionResponse,
+    SuggestionResponse,
+)
 
 
 class BoardTile(QPushButton):
@@ -108,6 +113,11 @@ class BoardScreen(QWidget):
             "background-color: #333; color: white; padding: 5px; font-size: 14px;"
         )
 
+        self.notification_label2 = QLabel("Notifications will go here")
+        self.notification_label2.setStyleSheet(
+            "background-color: #333; color: white; padding: 5px; font-size: 14px;"
+        )
+
         self.move_button = QPushButton("Move")
         self.move_button.clicked.connect(
             lambda: (
@@ -116,7 +126,7 @@ class BoardScreen(QWidget):
                 self.will_move.emit(True),
             ),
         )
-        self.dont_move_button = QPushButton("Don't")
+        self.dont_move_button = QPushButton("Don't Move")
         self.dont_move_button.clicked.connect(
             lambda: (
                 setattr(self, "turn_phase", "after_move"),
@@ -140,7 +150,7 @@ class BoardScreen(QWidget):
         self.suggestion_weapons_box = QComboBox()
         self.suggestion_weapons_box.addItems(WEAPONS)
 
-        self.dont_suggestion_button = QPushButton("Don't")
+        self.dont_suggestion_button = QPushButton("Don't Make a Suggestion")
         self.dont_suggestion_button.clicked.connect(
             lambda: (
                 setattr(self, "turn_phase", "after_suggest"),
@@ -170,7 +180,7 @@ class BoardScreen(QWidget):
         self.accusation_location_box = QComboBox()
         self.accusation_location_box.addItems(LOCATIONS)
 
-        self.dont_accusation_button = QPushButton("Don't")
+        self.dont_accusation_button = QPushButton("Don't Make an Accusation")
         self.dont_accusation_button.clicked.connect(
             lambda: (
                 setattr(self, "turn_phase", "after_accusation"),
@@ -199,6 +209,7 @@ class BoardScreen(QWidget):
 
         # Add the notification bar at the top
         self.main_layout.addWidget(self.notification_label)
+        self.main_layout.addWidget(self.notification_label2)
 
         self.buttons = [
             self.move_button,
@@ -251,6 +262,15 @@ class BoardScreen(QWidget):
             self.suggestion_response_list
         )
 
+        self.websocket_thread.game_info_bar.connect(self.update_game_info_bar)
+
+    def update_game_info_bar(self, string):
+        """Slot to update the player list based on the server's message."""
+        self.notification_label2.setText(string)
+
+        # for key in dictionary.keys():
+        #     self.update_player_position(key, dictionary[key])
+
     def update_board_dict(self, dictionary):
         """Slot to update the player list based on the server's message."""
         self.board_dict = dictionary
@@ -268,12 +288,14 @@ class BoardScreen(QWidget):
 
         if self.turn_dict["current_turn"]:
             self.notification_label.setText(
-                f"Your turn!\n Reminder, your cards include:\n{self.turn_dict['cards']}"
+                f"Your turn!\n Reminder, your cards include:\n{self.turn_dict['cards']}\nYou have seen the following cards:{self.turn_dict['seen_cards']}"
             )
             self.turn_phase = "start"
             self.update_button_vis()
         else:
-            self.notification_label.setText("It is somebody else's turn")
+            self.notification_label.setText(
+                f"It is somebody else's turn\n Reminder, your cards include:\n{self.turn_dict['cards']}\nYou have seen the following cards:{self.turn_dict['seen_cards']}"
+            )
             self.turn_phase = "none!"
             self.update_button_vis()
 
@@ -425,7 +447,9 @@ class BoardScreen(QWidget):
         self.update_button_vis()
 
         self.notification_label.setText(
-            "It is somebody else's turn. They made a suggestion, what will you respond with?"
+            f"It is somebody else's turn\n Reminder, your cards include:\n{self.turn_dict['cards']}\n \
+            You have seen the following cards:\n{self.turn_dict['seen_cards']}\n \
+            They made a suggestion, what will you respond with?"
         )
 
         # Clear any old buttons
@@ -451,10 +475,27 @@ class BoardScreen(QWidget):
             if widget is not None:
                 widget.setParent(None)
 
-        self.notification_label.setText("It is somebody else's turn.")
+        self.notification_label.setText(
+            f"It is somebody else's turn\n Reminder, your cards include:\n{self.turn_dict['cards']}\nYou have seen the following cards:{self.turn_dict['seen_cards']}"
+        )
 
+        resp = SuggestionResponse(
+            "IDK",
+            weapon="",
+            suspect="",
+            location="",
+            respondent=self.player_name,
+        )
+        if chosen_option in WEAPONS:
+            resp.weapon = chosen_option
+        elif chosen_option in SUSPECTS:
+            resp.suspect = chosen_option
+        elif chosen_option in LOCATIONS:
+            resp.location = chosen_option
         # Send back to server if needed
-        msg = {"type": "SUGGESTION_RESPONSE", "data": chosen_option}
+
+        # resp = SuggestionResponse(self.player_name, chosen_option)
+        msg = {"type": "SUGGESTION_RESPONSE", "data": resp.to_dict()}
 
         print(msg)
         self.player_response_suggestion_signal.emit(msg)
