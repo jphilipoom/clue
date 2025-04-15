@@ -300,7 +300,6 @@ class BoardScreen(QWidget):
             self.update_button_vis()
 
             self.highlight_valid_moves([])
-            print("NOT")
 
     def update_button_vis(self):
 

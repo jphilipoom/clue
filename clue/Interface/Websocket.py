@@ -70,24 +70,24 @@ class WebSocketThread(QThread):
 
     def will_accuse(self, value):
         self.will_accuse = value
+        self.will_suggest = False
         print("will accuse: " + str(value))
 
     def will_suggest(self, value):
         self.will_suggest = value
+        self.will_move = False
 
     def will_move(self, value):
         self.will_move = value
 
     def handle_accusation(self, value):
         self.accusation_value = value
-        print("HANDLING ACCUS")
 
     def handle_suggestion(self, value):
         self.suggestion_value = value
         print(value)
 
     def handle_suggestion_response(self, value):
-        print("HANDLE_SUGGESTION RESPONSE")
         self.suggestion_response_value = value
         print(value)
 
@@ -184,7 +184,6 @@ class WebSocketThread(QThread):
                         if self.will_suggest is True:
                             while self.suggestion_value is None:
                                 await asyncio.sleep(0.1)
-                                print("waiting sugg value")
 
                             # TODO: need to add code to show the user what the other user showed for their suggestion
 
@@ -201,12 +200,11 @@ class WebSocketThread(QThread):
                             # continue  # gives opportunity to see sugg resp??
 
                         while self.will_accuse is None:
-                            print("wait to see if accusing")
+                            # TODO: issue with getting stuck here and not sending a finished turn signal when not making an accusation....
                             await asyncio.sleep(0.1)
                         if self.will_accuse is True:
-                            # TODO: seems the code for making an accusation is NOT hit
+                            # TODO: this code is not hit when the bugs above happen with suggestion response info not seen
                             while self.accusation_value is None:
-                                print("waiting for an accusation")
                                 await asyncio.sleep(0.1)
                             print("send accus")
                             print(self.accusation_value)
@@ -215,6 +213,11 @@ class WebSocketThread(QThread):
                             await websocket.send(json.dumps(msg))
                         else:
                             print("will not accuse")
+
+                        print("MY TURN IS NOW OVER")
+                        msg = {"type": "FINISHED_TURN"}
+                        await websocket.send(json.dumps(msg))
+
                         (self.will_move, self.will_suggest, self.will_accuse) = (
                             None,
                             None,
@@ -229,10 +232,6 @@ class WebSocketThread(QThread):
                             None,
                             None,
                         )
-
-                        print("MY TURN IS NOW OVER")
-                        msg = {"type": "FINISHED_TURN"}
-                        await websocket.send(json.dumps(msg))
 
                 elif message_type == "SUGGESTION":
                     sugg = Suggestion(**message["data"])
@@ -288,49 +287,36 @@ class WebSocketThread(QThread):
 
                     if len(found_cards) > 0:
 
-                        # TODO: get erik's input on why the suggestion types get sent to the non-active player but NOT the player whose turn it is (this is causing issues with the accusation flow too)
+                        # # TODO: get erik's input on why the suggestion types get sent to the non-active player but NOT the player whose turn it is (this is causing issues with the accusation flow too)
                         self.suggestion_response_options_signal.emit(found_cards)
 
                         while self.suggestion_response_value is None:
                             print("waiting on user to provide response to a suggestion")
                             await asyncio.sleep(0.1)
 
-                        pub_sugg_resp = PublicSuggestionResponse(
-                            responding_player=MY_PLAYER.name, showed_card=True
-                        )
-
-                        msg = {
-                            "type": "PUBLIC_SUGGESTION_RESPONSE",
-                            "data": pub_sugg_resp.to_dict(),
-                        }
-                        print("Sending this publically to everyone")
-                        print(msg)
-                        await websocket.send(json.dumps(msg))
-
-                        print("try sending non public non private sugg resp")
-
-                        # THIS IS THE PRIVATE MSG
+                        # # THIS IS THE PRIVATE MSG
                         msg = self.suggestion_response_value
                         msg["data"]["player"] = sugg_resp.player
-                        print("sending it privately to suggesting player")
-                        print(msg)
-                        await websocket.send(json.dumps(msg))
 
                         msg["type"] = "SUGGESTION_RESPONSE"
-                        print("sending this ??? to everyone")
                         print(msg)
                         await websocket.send(json.dumps(msg))
 
                     else:
-                        pub_sugg_resp = PublicSuggestionResponse(
-                            responding_player=MY_PLAYER.name, showed_card=False
+                        empty_sugg_resp = SuggestionResponse(
+                            respondent=MY_PLAYER.name,
+                            player=sugg_resp.player,
+                            location="",
+                            weapon="",
+                            suspect="",
                         )
 
-                        print("public msg value: ")
+                        print("returning same thing, has nothing to offer msg value: ")
                         msg = {
-                            "type": "PUBLIC_SUGGESTION_RESPONSE",
-                            "data": pub_sugg_resp.to_dict(),
+                            "type": "SUGGESTION_RESPONSE",
+                            "data": empty_sugg_resp.to_dict(),
                         }
+
                         await websocket.send(json.dumps(msg))
 
                 elif message_type == "ACCUSATION":
