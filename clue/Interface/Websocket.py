@@ -168,14 +168,6 @@ class WebSocketThread(QThread):
                     self.player_turn_signal.emit(info)
 
                     if MY_PLAYER.current_turn:
-                        print(
-                            "value of wills "
-                            + str(self.will_accuse)
-                            + " "
-                            + str(self.will_move)
-                            + " "
-                            + str(self.will_suggest)
-                        )
                         # TODO: make sure this doesn't cause stalls when they pick not to move locations
                         # Wait until a location is selected
                         while self.will_move is None:
@@ -192,16 +184,19 @@ class WebSocketThread(QThread):
                         if self.will_suggest is True:
                             while self.suggestion_value is None:
                                 await asyncio.sleep(0.1)
+                                print("waiting sugg value")
 
                             # TODO: need to add code to show the user what the other user showed for their suggestion
 
                             msg = self.suggestion_value
                             await websocket.send(json.dumps(msg))
 
-                            while not self.suggestion_response_received:
-                                await asyncio.sleep(0.1)
-                                self.suggestion_response_received = False
                             # TODO: don't seem to see the response after a suggestion appear on suggestor's screen
+
+                            # while not self.suggestion_response_received:
+                            #     print("no resp received")
+                            #     await asyncio.sleep(0.1)
+                            #     self.suggestion_response_received = False
 
                             # continue  # gives opportunity to see sugg resp??
 
@@ -292,37 +287,49 @@ class WebSocketThread(QThread):
                     )
 
                     if len(found_cards) > 0:
+
+                        # TODO: get erik's input on why the suggestion types get sent to the non-active player but NOT the player whose turn it is (this is causing issues with the accusation flow too)
                         self.suggestion_response_options_signal.emit(found_cards)
 
                         while self.suggestion_response_value is None:
                             print("waiting on user to provide response to a suggestion")
                             await asyncio.sleep(0.1)
 
-                        msg = self.suggestion_response_value
-                        print(msg)
-                        msg["data"]["player"] = sugg_resp.player
+                        pub_sugg_resp = PublicSuggestionResponse(
+                            responding_player=MY_PLAYER.name, showed_card=True
+                        )
 
-                        # msg = {
-                        #     "type": "SUGGESTION_RESPONSE",
-                        #     "data": msg["data"].to_dict(),
-                        # }
-                        print("msg value: ")
+                        msg = {
+                            "type": "PUBLIC_SUGGESTION_RESPONSE",
+                            "data": pub_sugg_resp.to_dict(),
+                        }
+                        print("Sending this publically to everyone")
                         print(msg)
                         await websocket.send(json.dumps(msg))
+
+                        print("try sending non public non private sugg resp")
+
+                        # THIS IS THE PRIVATE MSG
+                        msg = self.suggestion_response_value
+                        msg["data"]["player"] = sugg_resp.player
+                        print("sending it privately to suggesting player")
+                        print(msg)
+                        await websocket.send(json.dumps(msg))
+
+                        msg["type"] = "SUGGESTION_RESPONSE"
+                        print("sending this ??? to everyone")
+                        print(msg)
+                        await websocket.send(json.dumps(msg))
+
                     else:
-                        print(
-                            "user does not have any relevent card info. sending empty response"
+                        pub_sugg_resp = PublicSuggestionResponse(
+                            responding_player=MY_PLAYER.name, showed_card=False
                         )
-                        resp = SuggestionResponse(
-                            sugg_resp.player,
-                            weapon="",
-                            suspect="",
-                            location="",
-                            respondent=MY_PLAYER.name,
-                        )
+
+                        print("public msg value: ")
                         msg = {
-                            "type": "SUGGESTION_RESPONSE",
-                            "data": resp.to_dict(),
+                            "type": "PUBLIC_SUGGESTION_RESPONSE",
+                            "data": pub_sugg_resp.to_dict(),
                         }
                         await websocket.send(json.dumps(msg))
 

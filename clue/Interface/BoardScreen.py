@@ -495,7 +495,7 @@ class BoardScreen(QWidget):
         # Send back to server if needed
 
         # resp = SuggestionResponse(self.player_name, chosen_option)
-        msg = {"type": "SUGGESTION_RESPONSE", "data": resp.to_dict()}
+        msg = {"type": "PRIVATE_SUGGESTION_RESPONSE", "data": resp.to_dict()}
 
         print(msg)
         self.player_response_suggestion_signal.emit(msg)
