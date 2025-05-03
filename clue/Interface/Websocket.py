@@ -60,6 +60,13 @@ class WebSocketThread(QThread):
         self.suggestion_response_received = False
         self.suggestion_response_value = None
 
+        self.suggestion_event = asyncio.Event()
+        self.accusation_event = asyncio.Event()
+        self.accusation_choice_event = asyncio.Event()
+        self.suggestion_choice_event = asyncio.Event()
+        self.move_choice_event = asyncio.Event()
+        self.move_event = asyncio.Event()
+
     def on_character_selected(self, character_selected_dict):
         character_name = character_selected_dict["selected_player"]
         self.selected_character = character_name  # Save selected character
@@ -67,24 +74,31 @@ class WebSocketThread(QThread):
 
     def on_character_moved(self, move_loc):
         self.tile_move = move_loc
+        self.move_event.set()
 
     def will_accuse(self, value):
         self.will_accuse = value
         self.will_suggest = False
         print("will accuse: " + str(value))
+        self.accusation_choice_event.set()
 
     def will_suggest(self, value):
         self.will_suggest = value
         self.will_move = False
+        self.suggestion_choice_event.set()
 
     def will_move(self, value):
         self.will_move = value
+        self.move_choice_event.set()
 
     def handle_accusation(self, value):
         self.accusation_value = value
+        self.accusation_event.set()  # Unblocks the coroutine waiting for this
 
     def handle_suggestion(self, value):
         self.suggestion_value = value
+        self.suggestion_event.set()  # Unblocks the coroutine waiting for this
+
         print(value)
 
     def handle_suggestion_response(self, value):
@@ -168,70 +182,7 @@ class WebSocketThread(QThread):
                     self.player_turn_signal.emit(info)
 
                     if MY_PLAYER.current_turn:
-                        # TODO: make sure this doesn't cause stalls when they pick not to move locations
-                        # Wait until a location is selected
-                        while self.will_move is None:
-                            await asyncio.sleep(0.1)
-                        if self.will_move is True:
-                            while self.tile_move is None:
-                                await asyncio.sleep(0.1)
-                            MY_PLAYER.location = self.tile_move
-                            msg = {"type": "PLAYER", "data": MY_PLAYER.to_dict()}
-                            await websocket.send(json.dumps(msg))
-
-                        while self.will_suggest is None:
-                            await asyncio.sleep(0.1)
-                        if self.will_suggest is True:
-                            while self.suggestion_value is None:
-                                await asyncio.sleep(0.1)
-
-                            # TODO: need to add code to show the user what the other user showed for their suggestion
-
-                            msg = self.suggestion_value
-                            await websocket.send(json.dumps(msg))
-
-                            # TODO: don't seem to see the response after a suggestion appear on suggestor's screen
-
-                            # while not self.suggestion_response_received:
-                            #     print("no resp received")
-                            #     await asyncio.sleep(0.1)
-                            #     self.suggestion_response_received = False
-
-                            # continue  # gives opportunity to see sugg resp??
-
-                        while self.will_accuse is None:
-                            # TODO: issue with getting stuck here and not sending a finished turn signal when not making an accusation....
-                            await asyncio.sleep(0.1)
-                        if self.will_accuse is True:
-                            # TODO: this code is not hit when the bugs above happen with suggestion response info not seen
-                            while self.accusation_value is None:
-                                await asyncio.sleep(0.1)
-                            print("send accus")
-                            print(self.accusation_value)
-
-                            msg = self.accusation_value
-                            await websocket.send(json.dumps(msg))
-                        else:
-                            print("will not accuse")
-
-                        print("MY TURN IS NOW OVER")
-                        msg = {"type": "FINISHED_TURN"}
-                        await websocket.send(json.dumps(msg))
-
-                        (self.will_move, self.will_suggest, self.will_accuse) = (
-                            None,
-                            None,
-                            None,
-                        )
-                        (
-                            self.accusation_value,
-                            self.suggestion_value,
-                            self.tile_move,
-                        ) = (
-                            None,
-                            None,
-                            None,
-                        )
+                        self.loop.create_task(self.handle_my_turn(websocket))
 
                 elif message_type == "SUGGESTION":
                     sugg = Suggestion(**message["data"])
@@ -268,12 +219,21 @@ class WebSocketThread(QThread):
                         print(
                             f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.location}"
                         )
+                        self.game_info_bar.emit(
+                            f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.location}"
+                        )
                     elif priv_sugg_resp.suspect != "":
                         print(
                             f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.suspect}"
                         )
+                        self.game_info_bar.emit(
+                            f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.suspect}"
+                        )
                     elif priv_sugg_resp.weapon != "":
                         print(
+                            f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.weapon}"
+                        )
+                        self.game_info_bar.emit(
                             f"Player {priv_sugg_resp.respondent} showed you {priv_sugg_resp.weapon}"
                         )
                 elif message_type == "SUGGESTION_RESPONSE":
@@ -339,3 +299,46 @@ class WebSocketThread(QThread):
                             f"{acc.player}, made an INCORRECT accusation: Location: {acc.location}, Weapon: {acc.weapon}, Suspect: {acc.suspect}, {acc.player} is now out of the game!"
                         )
                         print(f"{acc.player} is now out of the game!")
+
+    async def handle_my_turn(self, websocket):
+
+        try:
+
+            await self.move_choice_event.wait()
+            self.move_choice_event.clear()
+            if self.will_move:
+                await self.move_event.wait()
+                self.move_event.clear()
+                MY_PLAYER.location = self.tile_move
+                await websocket.send(
+                    json.dumps({"type": "PLAYER", "data": MY_PLAYER.to_dict()})
+                )
+
+            # suggestion phase
+            await self.suggestion_choice_event.wait()
+            self.suggestion_choice_event.clear()
+            if self.will_suggest:
+                await self.suggestion_event.wait()
+                self.suggestion_event.clear()
+                await websocket.send(json.dumps(self.suggestion_value))
+
+            # accusation phase
+            await self.accusation_choice_event.wait()
+            self.accusation_choice_event.clear()
+            if self.will_accuse:
+                await self.accusation_event.wait()
+                self.accusation_event.clear()
+                await websocket.send(json.dumps(self.accusation_value))
+
+            # end turn
+            print("TURN OVER")
+            await websocket.send(json.dumps({"type": "FINISHED_TURN"}))
+
+        finally:
+            # Reset all state flags
+            self.will_move = None
+            self.will_suggest = None
+            self.will_accuse = None
+            self.suggestion_value = None
+            self.accusation_value = None
+            self.tile_move = None
