@@ -84,16 +84,6 @@ class MainWindow(QWidget):
         self.clear_layout()
         self.layout.addWidget(self.player_select_screen)
 
-        # Simulate receiving the player list from the server
-        simulated_players = [
-            DumbPlayer("Dumb"),
-            DumbPlayer("Two"),
-            DumbPlayer("Three"),
-        ]
-
-        # Emit the signal to update the player list AFTER the PlayerSelectScreen is shown
-        self.player_select_screen.update_players_signal.emit(simulated_players)
-
     def on_character_selected(self, character_selected_dict):
         character_name = character_selected_dict["selected_player"]
         self.player_name = character_name
