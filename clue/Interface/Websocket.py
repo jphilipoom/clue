@@ -3,7 +3,6 @@ import websockets
 import json
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from Interface.Player import DumbPlayer
 from player import Player
 
 from msgs.messages import (
@@ -36,11 +35,12 @@ class WebSocketThread(QThread):
     character_selected_signal = pyqtSignal(
         dict
     )  # Signal to get selected character name
+    send_board_signal = pyqtSignal(dict)
     choose_player_signal = pyqtSignal(dict)
-    update_board_signal = pyqtSignal(dict)  # Signal to update players list
+    send_board_signal = pyqtSignal(dict)  # Signal to update players list
     player_turn_signal = pyqtSignal(dict)  # Signal to update players list
     tile_clicked = pyqtSignal(str)  # Signal to get selected character name
-    suggestion_response_options_signal = pyqtSignal(list)
+    suggestion_response_options_signal = pyqtSignal(dict)
     accusation_button_visibility_signal = pyqtSignal(bool)
 
     game_info_bar = pyqtSignal(str)
@@ -55,7 +55,6 @@ class WebSocketThread(QThread):
         self.starting_game = False
 
         self.tile_move = None
-
         self.tile_clicked.connect(self.on_character_moved)
 
         self.suggestion_response_received = False
@@ -83,6 +82,11 @@ class WebSocketThread(QThread):
         self.starting_game = character_selected_dict["start"]
 
     def on_character_moved(self, move_loc):
+        print(f"Websocket received on character move with value {move_loc}\n"
+            f"The current values of websocket are: {self.selected_character} {self.starting_game} "
+            f"{self.tile_move} {self.suggestion_response_value} {self.suggestion_response_received}")
+
+
         self.tile_move = move_loc
         self.move_event.set()
         # await self.move_queue.put(move_loc)
@@ -113,6 +117,7 @@ class WebSocketThread(QThread):
         # self.will_move = False
         # self.suggestion_choice_event.set()
         # print("turn phase" + str(self.turn_phase))
+        print("will suggest: " + str(value))
 
     def set_will_move(self, value):
         # self.turn_phase = 0
@@ -123,12 +128,14 @@ class WebSocketThread(QThread):
         # print("turn phase" + str(self.turn_phase))
 
         # self.move_choice_event.set()
+        print("will move: " + str(value))
 
     def handle_accusation(self, value):
         self.accusation_value = value
         self.accusation_event.set()  # Unblocks the coroutine waiting for this
         # print("turn phase" + str(self.turn_phase))
         # self.turn_phase = 2.5
+        print("accuse: " + str(value))
 
     def handle_suggestion(self, value):
         self.suggestion_value = value
@@ -136,11 +143,11 @@ class WebSocketThread(QThread):
         # self.turn_phase = 1.5
         # print("turn phase" + str(self.turn_phase))
 
-        # print(value)
+        # print("suggest: " + str(value))
 
     def handle_suggestion_response(self, value):
         self.suggestion_response_value = value
-        print(value)
+        print("suggest response: " + str(value))
 
     def run(self):
         """Integrate PyQt event loop with asyncio."""
@@ -175,7 +182,7 @@ class WebSocketThread(QThread):
 
                 if message_type == "CHOOSE_PLAYER":
                     # Update player list from the server message
-                    self.players = [DumbPlayer(x) for x in info["players"]]
+                    self.players = [Player(x) for x in info["players"]]
                     self.player_list_signal.emit(self.players)
                     self.choose_player_signal.emit(info)
 
@@ -206,7 +213,7 @@ class WebSocketThread(QThread):
 
                         await websocket.send(json.dumps(msg))
                 elif message_type == "BOARD":
-                    self.update_board_signal.emit(info)
+                    self.send_board_signal.emit(info)
 
                     current_board = info
 
@@ -285,14 +292,16 @@ class WebSocketThread(QThread):
                     # TODO: replace this text input with some sort of button/option on GUI
 
                     print("all the data provided in sugg resp")
-                    found_cards = MY_PLAYER.check_accusation(
-                        sugg_resp.weapon, sugg_resp.suspect, sugg_resp.location
-                    )
+                    accuser_details_dict = {
+                        "found_cards": MY_PLAYER.check_accusation(
+                            sugg_resp.weapon, sugg_resp.suspect, sugg_resp.location
+                        ),
+                        "accuser": sugg_resp.player
+                    }
 
-                    if len(found_cards) > 0:
+                    if len(accuser_details_dict["found_cards"]) > 0:
 
-                        # # TODO: get erik's input on why the suggestion types get sent to the non-active player but NOT the player whose turn it is (this is causing issues with the accusation flow too)
-                        self.suggestion_response_options_signal.emit(found_cards)
+                        self.suggestion_response_options_signal.emit(accuser_details_dict)
 
                         while self.suggestion_response_value is None:
                             print("waiting on user to provide response to a suggestion")

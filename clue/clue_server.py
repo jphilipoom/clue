@@ -225,18 +225,12 @@ async def handler(websocket):
                         )
                     )
 
-                    if suggestion.location:
-                        all_players[CURRENT_TURN_IDX].seen_cards["Location"].append(
-                            suggestion.location
-                        )
-                    elif suggestion.suspect:
-                        all_players[CURRENT_TURN_IDX].seen_cards["Suspect"].append(
-                            suggestion.suspect
-                        )
-                    elif suggestion.weapon:
-                        all_players[CURRENT_TURN_IDX].seen_cards["Weapon"].append(
-                            suggestion.weapon
-                        )
+                    if suggestion.location and suggestion.location not in all_players[CURRENT_TURN_IDX].seen_cards["Location"]:
+                        all_players[CURRENT_TURN_IDX].seen_cards["Location"].append(suggestion.location)
+                    elif suggestion.suspect and suggestion.suspect not in all_players[CURRENT_TURN_IDX].seen_cards["Suspect"]:
+                        all_players[CURRENT_TURN_IDX].seen_cards["Suspect"].append(suggestion.suspect)
+                    elif suggestion.weapon and suggestion.weapon not in all_players[CURRENT_TURN_IDX].seen_cards["Weapon"]:
+                        all_players[CURRENT_TURN_IDX].seen_cards["Weapon"].append(suggestion.weapon)
 
             elif message_type == "ACCUSATION":
                 print("Received accusation")

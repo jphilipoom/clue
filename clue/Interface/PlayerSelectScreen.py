@@ -13,12 +13,11 @@ from Interface.LobbyScreen import LobbyScreen
 
 
 class PlayerSelectScreen(QWidget):
-    update_players_signal = pyqtSignal(list)  # Signal to update players list
     character_selected_signal = pyqtSignal(
         dict
     )  # Signal to send selected character name
 
-    choose_players_dict = {"start": False}
+    choose_players_dict = {"start": False}  
     startable = False
 
     def __init__(self, websocket_thread, main_window):
@@ -75,7 +74,7 @@ class PlayerSelectScreen(QWidget):
         self.main_window.show_board_screen()
 
     def choose_player_update(self, choose_players_dict):
-        """Slot to update the player list based on the server's message."""
+        """Slot to update the player list based on the server's message.""" 
 
         self.choose_players_dict = choose_players_dict
 

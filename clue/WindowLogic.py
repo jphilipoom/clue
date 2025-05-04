@@ -16,7 +16,6 @@ from Interface.Websocket import WebSocketThread
 from Interface.StartScreen import StartScreen
 from Interface.LobbyScreen import LobbyScreen
 from Interface.PlayerSelectScreen import PlayerSelectScreen
-from Interface.Player import DumbPlayer
 from Interface.CardsScreen import CardsScreen
 from Interface.BoardScreen import BoardScreen
 
@@ -46,7 +45,6 @@ class MainWindow(QWidget):
         # Create screens
         self.start_screen = StartScreen(self.websocket_thread, self)
         self.player_select_screen = PlayerSelectScreen(self.websocket_thread, self)
-        self.lobby_screen = LobbyScreen(self.websocket_thread, self)
         self.cards_screen = CardsScreen(self.websocket_thread, self)
         self.board_screen = BoardScreen(self.websocket_thread, self)
 
@@ -118,15 +116,10 @@ class MainWindow(QWidget):
             if widget:
                 widget.setParent(None)
 
-
-def main():
+if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.setWindowTitle("Clue")
     window.setGeometry(100, 100, 400, 300)
     window.show()
     sys.exit(app.exec_())
-
-
-if __name__ == "__main__":
-    main()

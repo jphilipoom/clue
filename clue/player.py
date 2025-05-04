@@ -1,15 +1,14 @@
-
 class Player:
-    def __init__(self, name: str, location,cards,seen_cards,skip_turns,current_turn,valid_moves):
+    def __init__(self, name: str = "", location=None, cards=None, seen_cards=None, skip_turns=0,current_turn=False, valid_moves=None
+    ):
         self.name = name
         self.location = location
-        self.cards = cards or dict({'Weapon': [], 'Suspect': [], 'Location': []})
-        self.seen_cards = seen_cards or dict({'Weapon': [], 'Suspect': [], 'Location': []})
+        self.cards = cards if cards is not None else {'Weapon': [], 'Suspect': [], 'Location': []}
+        self.seen_cards = seen_cards if seen_cards is not None else {'Weapon': [], 'Suspect': [], 'Location': []}
         self.skip_turns = skip_turns
         self.current_turn = current_turn
-        self.valid_moves = valid_moves
-        return
-    
+        self.valid_moves = valid_moves if valid_moves is not None else []
+
     def to_dict(self):
         return {
             "name": self.name,
@@ -25,7 +24,6 @@ class Player:
         return self.name
 
     def check_accusation(self, weapon: str, suspect: str, location: str):
-        # Check if another player's accusation contrasts with a card you have
         found_cards = []
         if weapon in self.cards['Weapon']:
             found_cards.append(weapon)
@@ -33,5 +31,4 @@ class Player:
             found_cards.append(suspect)
         if location in self.cards['Location']:
             found_cards.append(location)
-
         return found_cards
