@@ -83,13 +83,13 @@ def initialize_game(all_players):
 
 def generate_valid_moves(all_players , player_locations):
     for current_player in all_players:
-        if len(current_player.location) < 4:
-            current_player.valid_moves = HALLWAYS[current_player.location]
+        if len(current_player.location) >= 2 and current_player.location[0] == 'H' and current_player.location[1].isdigit():
+            current_player.valid_moves = list(HALLWAYS[current_player.location])
             for loc in player_locations.values():
                 if loc in current_player.valid_moves:
                     current_player.valid_moves.remove(loc)
         else:
-            current_player.valid_moves = ROOMS[current_player.location]
+            current_player.valid_moves = list(ROOMS[current_player.location])
             if current_player.location in SECRET_PASSAGES:
                 if SECRET_PASSAGES[current_player.location] not in player_locations.values():
                     current_player.valid_moves.append(SECRET_PASSAGES[current_player.location])

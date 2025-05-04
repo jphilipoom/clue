@@ -19,7 +19,7 @@ async def connect():
 
     async with websockets.connect(uri) as websocket:
 
-        print("connected")
+        print("player has connected")
         while True:
             try:
                 if GAME_OVER:

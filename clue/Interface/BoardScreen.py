@@ -75,7 +75,6 @@ class BoardTile(QPushButton):
 class BoardScreen(QWidget):
     tile_clicked = pyqtSignal(str)  # Emits the name of the tile clicked
     update_board_signal = pyqtSignal(dict)  # Signal to send selected character name
-    player_turn_signal = pyqtSignal(dict)  # Signal to send selected character name
 
     player_accusation_signal = pyqtSignal(dict)
     player_suggestion_signal = pyqtSignal(dict)
@@ -89,7 +88,6 @@ class BoardScreen(QWidget):
     board_dict = {}
     player_accusation_dict = {}
     player_suggestion_dict = {}
-    suggestion_response_list = []
 
     player_name = None
 
@@ -256,7 +254,7 @@ class BoardScreen(QWidget):
 
         self.setLayout(self.main_layout)
 
-        self.websocket_thread.update_board_signal.connect(self.update_board_dict)
+        self.websocket_thread.send_board_signal.connect(self.update_board_dict)
         self.websocket_thread.player_turn_signal.connect(self.player_turn_dict)
         self.websocket_thread.suggestion_response_options_signal.connect(
             self.suggestion_response_list
@@ -303,7 +301,9 @@ class BoardScreen(QWidget):
 
     def update_button_vis(self):
 
-        [button.setVisible(False) for button in self.buttons]
+        for button in self.buttons:
+            button.setVisible(False)
+
 
         if self.turn_phase == "none!":
             return
@@ -439,7 +439,7 @@ class BoardScreen(QWidget):
 
         self.player_suggestion_signal.emit(msg)
 
-    def suggestion_response_list(self, options):
+    def suggestion_response_list(self, accuser_details_dict):
 
         self.turn_phase = "none!"
 
@@ -458,14 +458,14 @@ class BoardScreen(QWidget):
             if widget is not None:
                 widget.setParent(None)
 
-        for option in options:
+        for option in accuser_details_dict["found_cards"]:
             button = QPushButton(option)
             button.clicked.connect(
-                lambda _, opt=option: self.handle_suggestion_response(opt)
+                lambda _, opt=option: self.handle_suggestion_response(opt, accuser_details_dict["accuser"])
             )
             self.suggestion_button_layout.addWidget(button)
 
-    def handle_suggestion_response(self, chosen_option):
+    def handle_suggestion_response(self, chosen_option, accuser):
         print("You chose:", chosen_option)
 
         # Clear all suggestion buttons after one is clicked
@@ -479,7 +479,7 @@ class BoardScreen(QWidget):
         )
 
         resp = SuggestionResponse(
-            "IDK",
+            player=accuser,
             weapon="",
             suspect="",
             location="",
