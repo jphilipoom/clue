@@ -252,12 +252,13 @@ async def handler(websocket):
                 await send_out_accusation(accusation)
 
                 all_players[CURRENT_TURN_IDX].current_turn = False
-                CURRENT_TURN_IDX = get_next_turn_idx(CURRENT_TURN_IDX)
+                #CURRENT_TURN_IDX = get_next_turn_idx(CURRENT_TURN_IDX)
 
                 if CURRENT_TURN_IDX is not None:
-                    all_players[CURRENT_TURN_IDX].current_turn = True
-                    generate_valid_moves(all_players, PLAYER_TO_LOCATION)
-                    await send_out_player_information("")
+                    pass
+                    # all_players[CURRENT_TURN_IDX].current_turn = True
+                    # generate_valid_moves(all_players, PLAYER_TO_LOCATION)
+                    # await send_out_player_information("")
                 else:
                     print("No players left. Game over?")
 
