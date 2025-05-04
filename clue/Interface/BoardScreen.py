@@ -82,9 +82,9 @@ class BoardScreen(QWidget):
 
     player_response_suggestion_signal = pyqtSignal(dict)
 
-    will_move = pyqtSignal(bool)
-    will_accuse = pyqtSignal(bool)
-    will_suggest = pyqtSignal(bool)
+    set_will_move = pyqtSignal(bool)
+    set_will_accuse = pyqtSignal(bool)
+    set_will_suggest = pyqtSignal(bool)
 
     board_dict = {}
     player_accusation_dict = {}
@@ -123,7 +123,7 @@ class BoardScreen(QWidget):
             lambda: (
                 setattr(self, "turn_phase", "move"),
                 self.update_button_vis(),
-                self.will_move.emit(True),
+                self.set_will_move.emit(True),
             ),
         )
         self.dont_move_button = QPushButton("Don't Move")
@@ -131,7 +131,7 @@ class BoardScreen(QWidget):
             lambda: (
                 setattr(self, "turn_phase", "after_move"),
                 self.update_button_vis(),
-                self.will_move.emit(False),
+                self.set_will_move.emit(False),
             ),
         )
 
@@ -140,7 +140,7 @@ class BoardScreen(QWidget):
             lambda: (
                 setattr(self, "turn_phase", "suggest"),
                 self.update_button_vis(),
-                self.will_suggest.emit(True),
+                self.set_will_suggest.emit(True),
             ),
         )
 
@@ -155,7 +155,7 @@ class BoardScreen(QWidget):
             lambda: (
                 setattr(self, "turn_phase", "after_suggest"),
                 self.update_button_vis(),
-                self.will_suggest.emit(False),
+                self.set_will_suggest.emit(False),
             ),
         )
 
@@ -173,7 +173,7 @@ class BoardScreen(QWidget):
             lambda: (
                 setattr(self, "turn_phase", "accuse"),
                 self.update_button_vis(),
-                self.will_accuse.emit(True),
+                self.set_will_accuse.emit(True),
             ),
         )
 
@@ -185,7 +185,7 @@ class BoardScreen(QWidget):
             lambda: (
                 setattr(self, "turn_phase", "after_accusation"),
                 self.update_button_vis(),
-                self.will_accuse.emit(False),
+                self.set_will_accuse.emit(False),
             ),
         )
 
@@ -264,6 +264,14 @@ class BoardScreen(QWidget):
 
         self.websocket_thread.game_info_bar.connect(self.update_game_info_bar)
 
+        websocket_thread.accusation_button_visibility_signal.connect(
+            self.set_accusation_buttons_visible
+        )
+
+    def set_accusation_buttons_visible(self, visible: bool):
+        self.accusation_button.setVisible(visible)
+        self.dont_accusation_button.setVisible(visible)
+
     def update_game_info_bar(self, string):
         """Slot to update the player list based on the server's message."""
         self.notification_label2.setText(string)
@@ -324,6 +332,8 @@ class BoardScreen(QWidget):
             else:
                 self.turn_phase = "after_suggest"
                 self.update_button_vis()
+                self.set_will_suggest.emit(False),
+
         if self.turn_phase == "suggest":
             [
                 dropdown.setVisible(True)
@@ -336,8 +346,13 @@ class BoardScreen(QWidget):
             self.submit_suggestion_button.setVisible(True)
 
         if self.turn_phase == "after_suggest":
-            self.accusation_button.setVisible(True)
-            self.dont_accusation_button.setVisible(True)
+            [
+                dropdown.setVisible(False)
+                for dropdown in [
+                    self.suggestion_suspect_box,
+                    self.suggestion_weapons_box,
+                ]
+            ]
 
         if self.turn_phase == "accuse":
             [
