@@ -460,6 +460,8 @@ class BoardScreen(QWidget):
 
         self.update_button_vis()
 
+        self.suggestion_button_container.setVisible(True)
+
         self.notification_label.setText(
             f"It is somebody else's turn\n Reminder, your cards include:\n{self.turn_dict['cards']}\n \
             You have seen the following cards:\n{self.turn_dict['seen_cards']}\n \
@@ -513,6 +515,8 @@ class BoardScreen(QWidget):
 
         print(msg)
         self.player_response_suggestion_signal.emit(msg)
+
+        self.suggestion_button_container.setVisible(False)
 
 
 if __name__ == "__main__":
